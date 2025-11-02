@@ -23,6 +23,7 @@ class ContentGenerationRequest(BaseModel):
     selected_usp: str = Field(..., description="USP đã chọn để tập trung.")
     selected_tone: Tone = Field(..., description="Giọng điệu nội dung đã chọn.")
     selected_format: Format = Field(..., description="Định dạng nội dung đã chọn.")
+    infor: str = Field(..., description="Các thông số sản phẩm nổi bật.")
 
 # Định nghĩa Model cho Response trả về Frontend
 class GeneratedContentResponse(BaseModel):

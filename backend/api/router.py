@@ -29,7 +29,7 @@ def analyze_product(request: ProductAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"Lỗi Server: Không thể phân tích sản phẩm. Lỗi chi tiết: {str(e)}")
         
     # Trả về kết quả rỗng (200 OK) nếu AI không tìm thấy dữ liệu
-    return ProductAnalysisResult(product_name=request.product_name, usps=[], pain_points=[], target_persona="Không tìm thấy dữ liệu.")
+    return ProductAnalysisResult(product_name=request.product_name, usps=[], pain_points=[], infor="Khong tim thay du lieu", target_persona="Không tìm thấy dữ liệu.")
 
 
 # ===============================================
@@ -64,7 +64,8 @@ def generate_poster(
     product_name: str = Query(..., description="Tên sản phẩm."),
     ad_copy: str = Query(..., description="Nội dung quảng cáo (Ad Copy) đã tạo ở Giai đoạn 2."),
     target_persona: str = Query(..., description="Chân dung khách hàng."),
-    selected_usp: str = Query(..., description="USP đang được tập trung.")
+    selected_usp: str = Query(..., description="USP đang được tập trung."),
+    infor: str = Query(..., description="Các thông số sản phẩm nổi bật."),
 ):
     """
     Endpoint Giai đoạn 3: Nhận các thông số và Ad Copy để tạo Poster/Ảnh quảng cáo.
@@ -72,7 +73,7 @@ def generate_poster(
     print(f"Bắt đầu tạo Poster cho sản phẩm: {product_name}")
     try:
         # Gọi hàm tạo ảnh
-        result = generate_marketing_poster(product_name, ad_copy, target_persona, selected_usp)
+        result = generate_marketing_poster(product_name, ad_copy, target_persona, infor, selected_usp)
         if result:
             return result
     except Exception as e:

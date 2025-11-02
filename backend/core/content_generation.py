@@ -20,21 +20,31 @@ def generate_marketing_content(request: ContentGenerationRequest) -> GeneratedCo
     
     # 1. Xây dựng Prompt Engineering từ các biến
     prompt = f"""
-    Bạn là chuyên gia copywriter. Hãy tạo ra nội dung marketing chất lượng cao dựa trên các thông số sau:
+You are a professional copywriter. Create high-quality marketing content based on the following parameters:
 
-    --- THÔNG SỐ CHIẾN DỊCH ---
-    1. Sản phẩm: {request.product_name}
-    2. Chân dung khách hàng (Persona): {request.target_persona}
-    3. Điểm bán hàng độc nhất (USP) được tập trung: {request.selected_usp}
-    4. Giọng điệu (Tone): {request.selected_tone.value}
-    5. Định dạng (Format): {request.selected_format.value}
+CAMPAIGN DETAILS
 
-    --- YÊU CẦU ĐẦU RA ---
-    Dựa trên Persona và USP, hãy viết một nội dung Marketing hoàn chỉnh với {request.selected_tone.value} tone, phù hợp với {request.selected_format.value}. 
-    
-    Đầu ra phải là một JSON Object duy nhất, HỢP LỆ (không có bất kỳ text nào khác ngoài JSON) với 2 keys:
-    - "title": (String) Một tiêu đề hấp dẫn phù định dạng.
-    - "content": (String) Nội dung bài viết/kịch bản chi tiết.
+Product: {request.product_name}
+
+Customer Persona: {request.target_persona}
+
+Focused Unique Selling Point (USP): {request.selected_usp}
+
+Key Product Highlights: {request.infor}
+
+Tone of Voice: {request.selected_tone.value}
+
+Format: {request.selected_format.value}
+
+OUTPUT REQUIREMENTS
+
+Based on the Persona and USP, write a complete marketing piece with the specified {request.selected_tone.value} tone, tailored to the {request.selected_format.value} format.
+
+The output must be a single, valid JSON object (no additional text outside the JSON) with the following two keys:
+
+"title": (String) An engaging title suitable for the chosen format.
+
+"content": (String) The detailed article/script content.
     """
 
     try:

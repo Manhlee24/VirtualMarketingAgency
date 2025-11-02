@@ -21,14 +21,19 @@ def analyze_product_data(product_name: str) -> ProductAnalysisResult | None:
     
     # Kỹ thuật Prompt Engineering
     prompt = f"""
-    Thực hiện nghiên cứu thị trường cho sản phẩm: '{product_name}'.
-    Sử dụng dữ liệu tìm kiếm công khai, hãy phân tích để trích xuất các thông số sau:
-    1.  Tối thiểu 3 **Điểm bán hàng độc nhất (USP)** của sản phẩm.
-    2.  Tối thiểu 3 **Điểm đau của khách hàng (Pain Points)** mà sản phẩm này giải quyết.
-    3.  Một **Chân dung khách hàng mục tiêu (Target Persona)** chi tiết, mô tả nhân khẩu học và tâm lý.
+    Conduct market research for the product: '{product_name}'.
+Using publicly available search data, analyze and extract the following parameters:
 
-    Định dạng kết quả đầu ra **bắt buộc** phải là một JSON object HỢP LỆ (không có bất kỳ text nào khác ngoài JSON) 
-    với các keys: 'usps' (list of strings), 'pain_points' (list of strings), và 'target_persona' (string).
+1. At least 3 Unique Selling Points (USPs) of the product.
+
+2. At least 3 Customer Pain Points that the product addresses.
+
+3. A brief description of the Target Customer Persona for this product.
+
+4. Key Product Specifications, only using 5 short keywords.
+
+The output must be a valid JSON object (no additional text outside the JSON)
+with the following keys: 'usps' (list of strings), 'pain_points' (list of strings), 'infor' (string), and 'target_persona' (string)
     """
 
     try:
@@ -59,7 +64,8 @@ def analyze_product_data(product_name: str) -> ProductAnalysisResult | None:
             product_name=product_name,
             usps=data.get('usps', []),
             pain_points=data.get('pain_points', []),
-            target_persona=data.get('target_persona', 'Chưa xác định')
+            target_persona=data.get('target_persona', 'Chưa xác định'),
+            infor=data.get('infor', 'Chưa xác định')
         )
         
     except Exception as e:

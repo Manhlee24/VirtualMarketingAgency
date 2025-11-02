@@ -15,3 +15,4 @@ class ProductAnalysisResult(BaseModel):
     usps: List[str] = Field(..., description="Danh sách các Điểm bán hàng độc nhất (USP).")
     pain_points: List[str] = Field(..., description="Danh sách các Điểm đau của khách hàng (Pain Points).")
     target_persona: str = Field(..., description="Chân dung khách hàng mục tiêu chi tiết.")
+    infor: str = Field(..., description="Các thông số sản phẩm vượt trội.")
