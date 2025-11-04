@@ -1,6 +1,6 @@
 # backend/api/router.py
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Form, UploadFile, File
 from models.product import ProductAnalysisRequest, ProductAnalysisResult
 from models.content import ContentGenerationRequest, GeneratedContentResponse
 from core.data_analysis import analyze_product_data
@@ -59,26 +59,40 @@ def generate_content(request: ContentGenerationRequest):
 # ===============================================
 
 @router.post("/generate_poster", response_model=ImageGenerationResponse)
-def generate_poster(
-    # Sử dụng Query để nhận các thông số qua URL Parameters
-    product_name: str = Query(..., description="Tên sản phẩm."),
-    ad_copy: str = Query(..., description="Nội dung quảng cáo (Ad Copy) đã tạo ở Giai đoạn 2."),
-    target_persona: str = Query(..., description="Chân dung khách hàng."),
-    selected_usp: str = Query(..., description="USP đang được tập trung."),
-    infor: str = Query(..., description="Các thông số sản phẩm nổi bật."),
+async def generate_poster(
+    product_name: str = Form(..., description="Tên sản phẩm."),
+    ad_copy: str = Form(..., description="Nội dung quảng cáo (Ad Copy) đã tạo ở Giai đoạn 2."),
+    persona: str = Form(..., description="Chân dung khách hàng."),
+    usp: str = Form(..., description="USP đang được tập trung."),
+    infor: str = Form(..., description="Các thông số sản phẩm nổi bật."),
+    style_short: str = Form(None, description="Yêu cầu phong cách ngắn (tuỳ chọn)."),
+    reference_image: UploadFile = File(None, description="Hình ảnh tham khảo (tùy chọn)")
 ):
     """
     Endpoint Giai đoạn 3: Nhận các thông số và Ad Copy để tạo Poster/Ảnh quảng cáo.
+    Nhận form-data (có thể kèm file).
     """
     print(f"Bắt đầu tạo Poster cho sản phẩm: {product_name}")
     try:
-        # Gọi hàm tạo ảnh
-        result = generate_marketing_poster(product_name, ad_copy, target_persona, infor, selected_usp)
+        ref_bytes = None
+        if reference_image:
+            ref_bytes = await reference_image.read()
+        # gọi hàm core (trả về ImageGenerationResponse)
+        result = generate_marketing_poster(
+            product_name=product_name,
+            ad_copy=ad_copy,
+            persona=persona,
+            infor=infor,
+            usp=usp,
+            style_short=style_short,
+            reference_image_bytes=ref_bytes
+        )
         if result:
             return result
     except Exception as e:
-        print(f"Lỗi tạo Poster ở Giai đoạn 3: {e}")
-        raise HTTPException(status_code=500, detail=f"Lỗi Server: Không thể tạo Poster. Lỗi chi tiết: {str(e)}")
-
+        # đảm bảo trả chuỗi, không trả object
+        msg = str(e)
+        print(f"Lỗi tạo Poster ở Giai đoạn 3: {msg}")
+        raise HTTPException(status_code=500, detail=msg)
     # Trả về lỗi nếu không tạo được ảnh
     raise HTTPException(status_code=400, detail="Không thể tạo Poster, vui lòng kiểm tra log backend.")

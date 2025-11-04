@@ -42,6 +42,11 @@ function ContentGenerationForm() {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageError, setImageError] = useState(null);
 
+  // Additional states for style short & reference image (Phase 3)
+  const [styleShort, setStyleShort] = useState("");
+  const [referenceImageFile, setReferenceImageFile] = useState(null);
+  const [referenceImagePreview, setReferenceImagePreview] = useState(null);
+  
   // General States
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -129,26 +134,50 @@ function ContentGenerationForm() {
 
     try {
       if (selectedFormat.includes("Ad Copy")) {
-        const response = await axios.post(`${BASE_URL}/generate_poster`, null, {
-          params: {
-            product_name: analysisData.product_name,
-            ad_copy: generatedContent.content,
-            target_persona: analysisData.target_persona,
-            selected_usp: selectedUsp,
-            infor: analysisData.infor,
-          },
+        const formData = new FormData();
+        formData.append("product_name", analysisData.product_name);
+        formData.append("ad_copy", generatedContent.content);
+        formData.append("persona", analysisData.target_persona); // match backend param name
+        formData.append("usp", selectedUsp);
+        formData.append("infor", analysisData.infor);
+        if (styleShort) formData.append("style_short", styleShort);
+        if (referenceImageFile) formData.append("reference_image", referenceImageFile);
+
+        const response = await axios.post(`${BASE_URL}/generate_poster`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
         });
         setGeneratedPoster(response.data);
       } else {
         setImageError(
-          "Chức năng tạo Poster chỉ khả dụng khi Định dạng nội dung là 'Nội dung quảng cáo ngắn (Ad Copy)'."
+          "Chức năng tạo Poster chỉ khả dụng khi Định dạng nội dung là 'Nội dung quảng cáo ngắn (Ad Copy)'.",
         );
       }
     } catch (err) {
       console.error("Lỗi khi gọi API tạo Poster:", err);
-      setImageError("Lỗi: Không thể tạo Poster. Kiểm tra Server Backend.");
+      setImageError(stringifyError(err));
     } finally {
       setIsGeneratingImage(false);
+    }
+  };
+
+  // Helper: stringify backend/frontend error objects
+  const stringifyError = (err) => {
+    if (!err) return "Unknown error";
+    // axios response with detail or validation errors
+    if (err.response && err.response.data) {
+      const d = err.response.data;
+      if (typeof d === "string") return d;
+      try {
+        return JSON.stringify(d);
+      } catch {
+        return String(d);
+      }
+    }
+    if (err.message) return err.message;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
     }
   };
 
@@ -291,14 +320,10 @@ function ContentGenerationForm() {
       >
         &larr; Quay lại Kết Quả Phân Tích (Giai đoạn 1)
       </button>
+      
       <h3 className="text-3xl font-extrabold text-gray-900 mb-6">
         GIAI ĐOẠN 2 & 3: Sáng Tạo Nội Dung & Media ✨
       </h3>
-
-      <p className="text-gray-600 mb-8 border-l-4 border-indigo-400 pl-4 italic bg-indigo-50 p-4 rounded-md">
-        Sử dụng ma trận **USP x Persona x Tone x Format** để tạo nội dung và sau
-        đó sản xuất Poster.
-      </p>
 
       {/* Form Chọn Biến Số Marketing (Giai đoạn 2 Input) */}
       <form
@@ -401,8 +426,50 @@ function ContentGenerationForm() {
               {formatContent(generatedContent.content)}
             </div>
           </div>
+        </div>
+      )}
 
-          {/* BUTTON TẠO POSTER (GIAI ĐOẠN 3) */}
+      {/* Tùy chọn Poster - CHỈ HIỆN SAU KHI CÓ NỘI DUNG */}
+      {generatedContent && (
+        <div className="p-6 bg-white rounded-xl shadow-lg border border-gray-200 mb-6">
+          <h4 className="text-lg font-bold text-gray-800 mb-3">Tùy chọn Poster (Giai đoạn 3)</h4>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Yêu cầu phong cách ngắn (ví dụ: "minimal, bright, product on marble table")
+          </label>
+          <input
+            type="text"
+            value={styleShort}
+            onChange={(e) => setStyleShort(e.target.value)}
+            placeholder="Nhập yêu cầu phong cách ngắn..."
+            className="w-full px-3 py-2 border rounded-lg mb-3"
+          />
+
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Hình ảnh tham khảo (tùy chọn)
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              setReferenceImageFile(file);
+              if (file) {
+                const url = URL.createObjectURL(file);
+                setReferenceImagePreview(url);
+              } else {
+                setReferenceImagePreview(null);
+              }
+            }}
+            className="w-full mb-3"
+          />
+          {referenceImagePreview && (
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 mb-2">Xem trước hình ảnh tham khảo:</p>
+              <img src={referenceImagePreview} alt="Preview" className="max-w-xs rounded-md shadow-sm" />
+            </div>
+          )}
+
+          {/* Button tạo poster */}
           <button
             onClick={handlePosterGeneration}
             disabled={isGeneratingImage}
@@ -419,7 +486,7 @@ function ContentGenerationForm() {
         </div>
       )}
 
-      {/* Hiển thị Kết quả Poster (Giai đoạn 3 Output) */}
+      {/* Hiển thị kết quả poster */}
       {(generatedPoster || imageError) && (
         <div className="p-8 bg-pink-50 rounded-xl border-2 border-pink-300 shadow-inner">
           <h4 className="text-xl font-extrabold text-pink-700 mb-4 border-b pb-2">
@@ -442,7 +509,7 @@ function ContentGenerationForm() {
                 Prompt đã dùng:{" "}
                 <span className="font-mono text-xs">
                   {generatedPoster.prompt_used}
-                </span>
+                 </span>
               </p>
               <a
                 href={generatedPoster.image_url}

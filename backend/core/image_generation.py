@@ -3,12 +3,29 @@ import base64
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from typing import Optional
+from io import BytesIO
+
+# optional imports
+try:
+    from PIL import Image
+except Exception:
+    Image = None
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")  # vẫn đọc nhưng sẽ bị bỏ qua nếu OPENAI_API_KEY có
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Sử dụng OpenAI mới (openai>=1.0.0)
+# Gemini client (optional)
+try:
+    from google import generativeai as genai
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-2.5-flash')  # Dùng gemini-pro thay vì gemini-2.5-flash
+    gemini_client = model if GEMINI_API_KEY else None
+except Exception as e:
+    print(f"Failed to initialize Gemini: {e}")
+    gemini_client = None
+
+# OpenAI client (optional, dùng SDK mới)
 try:
     from openai import OpenAI
     openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
@@ -19,85 +36,122 @@ class ImageGenerationResponse(BaseModel):
     image_url: str = Field(..., description="URL công khai hoặc Data URL Base64 chứa ảnh Poster đã tạo.")
     prompt_used: str = Field(..., description="Prompt đã sử dụng để tạo ảnh.")
 
+def _expand_style_with_gemini(style_short: str, product_name: str, infor: str, target_persona: str, selected_usp: str, ad_copy: str) -> Optional[str]:
+    """
+    Gọi Gemini 'gemini-2.5-flash' để mở rộng một yêu cầu phong cách ngắn thành prompt chi tiết.
+    Trả về chuỗi prompt chi tiết hoặc None nếu thất bại.
+    """
+    if not style_short:
+        return None
+
+    instruction = (
+        f"You are an expert prompt engineer for image generation. Expand the short style request below into a\n"
+        f"detailed image-generation prompt suitable for photorealistic advertising posters.\n"
+        f"Include composition, camera angle, focal length, lighting, color palette, materials/textures, mood, and stylistic keywords.\n"
+        f"include key product higtlight with {infor} adding text overlays or UI. Output only the detailed prompt.\n\n"
+        f"Short style request: {style_short}\n\n"
+        f"Product context:\n"
+        f"- Product: {product_name}\n"
+        f"- Example ad copy: {ad_copy}\n"
+        f"- Note: limit 100 words"
+    )
+
+    try:
+        if gemini_client:
+            response = gemini_client.generate_content(instruction)
+            return response.text.strip()
+    except Exception as e:
+        print(f"Warning: gemini_client.responses.create failed: {e}")
+
+    print("Info: Gemini expansion not available. Skipping style expansion.")
+    return None
+
 def generate_marketing_poster(
     product_name: str,
     ad_copy: str,
     persona: str,
     infor: str,
     usp: str,
-    # Cập nhật kích thước hỗ trợ cho 'gpt-image-1'
-    size: str = "1024x1024",  
+    style_short: Optional[str] = None,
+    reference_image_bytes: Optional[bytes] = None,
+    size: str = "1024x1024",
     n_images: int = 1
 ) -> Optional[ImageGenerationResponse]:
-    """Chỉ dùng OpenAI images (ưu tiên). Nếu không có key hoặc lỗi -> mock URL."""
-    image_prompt = f"""
-    Create a premium, high-quality digital advertising poster for {product_name}, designed in a luxurious, contemporary Apple-style aesthetic.
-
-The layout should be minimalist, elegant, and perfectly balanced, with cinematic lighting and a dark gradient background (black, graphite, or deep space gray).
-
-The product should be the main visual focus, placed centrally or slightly offset, rendered with realistic reflections, fine metal textures, and soft shadows.
-
-On one side of the poster, include clean, legible English text listing key specifications:
-{infor}
-
-The text must be crisp, sharp, and free of distortion, using a modern sans-serif font (similar to SF Pro or Helvetica Neue), in white or silver, with balanced line spacing and hierarchy.
-
-Maintain a premium, cinematic, and modern advertising style, emphasizing simplicity, contrast, and precision.
-
-No watermark, no spelling errors, no warped text, no excessive elements.
-The final composition should look like an official Apple marketing poster — sleek, polished, and aspirational.
     """
+    Sinh prompt cuối cùng:
+    - Nếu user không nhập style_short -> dùng base_prompt.
+    - Nếu user nhập style_short và Gemini trả về prompt mở rộng -> CHỈ dùng prompt mở rộng.
+    - Nếu user nhập style_short nhưng Gemini không trả về (None) -> fallback về base_prompt.
+    """
+    try:
+        base_prompt = f"""
+Create a premium, high-quality digital advertising poster for {product_name}.
+Product details: {infor}
+Target persona: {persona}
+USP: {usp}
+Ad copy sample: {ad_copy}
 
-    # Nếu có OpenAI client thì dùng nó (bỏ qua Gemini)
-    if openai_client:
-        try:
-            print("Đang gọi OpenAI Images API (gpt-image-1)...")
-            
-            # Đảm bảo size hợp lệ cho mô hình 'gpt-image-1'
-            allowed_sizes = {"1024x1024", "1024x1536", "1536x1024"}
-            if size not in allowed_sizes:
-                print(f"Warning: size '{size}' không hợp lệ cho 'gpt-image-1'. Sử dụng '1024x1024' thay thế.")
-                size = "1024x1024"
-                
-            resp = openai_client.images.generate(
-                model="gpt-image-1", 
-                prompt=image_prompt,
-                size=size,
-                n=n_images,
-                # ĐÃ XÓA THAM SỐ response_format gây lỗi
-                # Nếu mô hình này trả về Base64, nó sẽ tự động đi vào resp.data[0].b64_json.
-                # Nếu nó trả về URL, nó sẽ đi vào resp.data[0].url.
-            )
-            
-            if resp and getattr(resp, "data", None) and len(resp.data) > 0:
-                result_data = resp.data[0]
-                
-                # Ưu tiên lấy URL công khai (là mặc định cho hầu hết các mô hình DALL-E)
-                if hasattr(result_data, 'url') and result_data.url:
-                    print("Nhận được URL công khai.")
-                    return ImageGenerationResponse(image_url=result_data.url, prompt_used=image_prompt.strip())
-                
-                # Nếu không có URL, kiểm tra Base64 (phù hợp với logic Base64 ban đầu của bạn)
-                elif hasattr(result_data, 'b64_json') and result_data.b64_json:
-                    print("Nhận được dữ liệu Base64.")
-                    b64 = result_data.b64_json
-                    data_url = f"data:image/png;base64,{b64}"
-                    return ImageGenerationResponse(image_url=data_url, prompt_used=image_prompt.strip())
-            
-            # Nếu resp.data rỗng hoặc không có cả url và b64_json
-            raise Exception("Phản hồi tạo ảnh hợp lệ nhưng không chứa URL hoặc Base64.")
-            
-        except Exception as e:
-            # Xử lý ngoại lệ rõ ràng hơn
-            error_message = str(e)
-            if "content_policy_violation" in error_message:
-                print("LỖI OpenAI Images API: Vi phạm chính sách nội dung. Vui lòng kiểm tra lại SẢN PHẨM và NỘI DUNG QUẢNG CÁO.")
-            elif "Unknown parameter" in error_message:
-                print(f"LỖI OpenAI Images API: Lỗi tham số. Có vẻ mô hình '{getattr(resp, 'model', 'gpt-image-1')}' không hỗ trợ tham số nào đó.")
-            else:
-                print(f"LỖI OpenAI Images API: {e}")
+Requirements:
+- Modern, minimalist, cinematic lighting.
+- Product centered, realistic materials and reflections.
+- No text overlays in the image itself (UI/text will be added separately).
+""".strip()
 
-    # Nếu không có OpenAI hoặc lỗi -> trả mock
-    mock_url = "https://via.placeholder.com/800x800.png?text=MOCK+KHI+THIEU+OPENAI+KEY+HOAC+LOI"
-    print("CẢNH BÁO: Không tạo được ảnh thực. Dùng Mock data.")
-    return ImageGenerationResponse(image_url=mock_url, prompt_used=image_prompt.strip())
+        # Nếu user có nhập style ngắn -> cố gắng mở rộng bằng Gemini
+        detailed_style = None
+        if style_short:
+            detailed_style = _expand_style_with_gemini(style_short, product_name, infor, persona, usp, ad_copy)
+
+        # Quy tắc chọn final_prompt:
+        # - Nếu có style_short và detailed_style không rỗng -> chỉ dùng detailed_style
+        # - Ngược lại -> dùng base_prompt
+        if style_short and detailed_style:
+            final_prompt = detailed_style.strip()
+            # (tùy chọn) thêm context ngắn về sản phẩm vào cuối prompt mở rộng để giữ thông tin cần thiết
+            final_prompt = final_prompt + f"\n\nProduct context: {product_name}. Key info: {infor}. USP: {usp}."
+        else:
+            final_prompt = base_prompt
+
+        # Nếu có ảnh tham khảo, thêm 1 câu ngắn (không chèn base64 lớn)
+        if reference_image_bytes:
+            final_prompt += "\n\nNote: A reference image was provided — use its composition, color palette and materials as inspiration."
+
+        # Nếu có OpenAI client thì gọi Images API
+        if openai_client:
+            try:
+                print("Calling OpenAI Images API (gpt-image-1)...")
+                allowed_sizes = {"1024x1024", "1024x1536", "1536x1024"}
+                if size not in allowed_sizes:
+                    size = "1024x1024"
+
+                resp = openai_client.images.generate(
+                    model="gpt-image-1",
+                    prompt=final_prompt,
+                    size=size,
+                    n=n_images,
+                )
+                # parse response
+                if resp and getattr(resp, "data", None) and len(resp.data) > 0:
+                    result_data = resp.data[0]
+                    # url
+                    url = getattr(result_data, "url", None)
+                    if url:
+                        return ImageGenerationResponse(image_url=url, prompt_used=final_prompt)
+                    # base64 field
+                    b64 = getattr(result_data, "b64_json", None) or getattr(result_data, "b64", None)
+                    if b64:
+                        data_url = f"data:image/png;base64,{b64}"
+                        return ImageGenerationResponse(image_url=data_url, prompt_used=final_prompt)
+                raise Exception("Image API returned no usable image data.")
+            except Exception as e:
+                print(f"OpenAI Images error: {e}")
+                # fallthrough to mock
+
+        # fallback: trả mock placeholder (an toàn)
+        placeholder = "https://via.placeholder.com/1024x1024.png?text=Generated+Poster+Mock"
+        return ImageGenerationResponse(image_url=placeholder, prompt_used=final_prompt)
+    except Exception as e:
+        err = str(e)
+        print(f"Error in generate_marketing_poster: {err}")
+        placeholder = "https://via.placeholder.com/1024x1024.png?text=ERROR"
+        return ImageGenerationResponse(image_url=placeholder, prompt_used=f"ERROR: {err}")
