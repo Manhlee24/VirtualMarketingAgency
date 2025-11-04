@@ -1,6 +1,14 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  # <<-- THAY ĐỔI Ở ĐÂY
+from fastapi.middleware.cors import CORSMiddleware
 from api.router import router as api_router
+from api.auth_router import router as auth_router
+import sys
+import os
+
+# Add the backend directory to Python path
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if BACKEND_DIR not in sys.path:
+    sys.path.append(BACKEND_DIR)
 
 app = FastAPI(title="Virtual Marketing Agency Backend")
 
@@ -23,7 +31,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api")
-
+app.include_router(auth_router, prefix="/api/auth")
 @app.get("/")
 def read_root():
     return {"message": "Virtual Marketing Agency Backend - Ready"}

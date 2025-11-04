@@ -1,0 +1,7 @@
+SQLAlchemy>=2.0.0
+pymysql
+passlib[bcrypt]
+python-jose[cryptography]
+
+# Install with:
+# pip install -r backend/requirements-auth.txt
