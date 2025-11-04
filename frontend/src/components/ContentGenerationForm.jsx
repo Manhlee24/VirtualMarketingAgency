@@ -105,7 +105,6 @@ function ContentGenerationForm() {
         selected_format: selectedFormat,
         infor: analysisData.infor,
       };
-
       const response = await axios.post(
         `${BASE_URL}/generate_content`,
         requestData
@@ -118,15 +117,12 @@ function ContentGenerationForm() {
       setLoading(false);
     }
   };
-
   // GIAI ĐOẠN 3: Tạo Poster Quảng cáo
   const handlePosterGeneration = async () => {
     if (!generatedContent || isGeneratingImage) return;
-
     setIsGeneratingImage(true);
     setImageError(null);
     setGeneratedPoster(null);
-
     try {
       if (selectedFormat.includes("Ad Copy")) {
         const response = await axios.post(`${BASE_URL}/generate_poster`, null, {
@@ -186,9 +182,15 @@ function ContentGenerationForm() {
               : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-400/50"
           }`}
         >
-          {loading
-            ? "Đang Vận Hành Engine AI..."
-            : "KHỞI ĐỘNG PHÂN TÍCH THỊ TRƯỜNG"}
+              {loading ? (
+                <div className="flex items-center gap-2 text-white-500 font-semibold">
+                  <span className="animate-spin h-5 w-5 border-4 border-white-500 border-t-transparent rounded-full"></span>
+                  <span>Đang Vận Hành Engine AI...</span>
+                </div>
+              ) : (
+                <span className="text-gray-800 font-semibold">KHỞI ĐỘNG PHÂN TÍCH THỊ TRƯỜNG</span>
+              )}
+
         </button>
       </form>
     </div>
@@ -245,15 +247,14 @@ function ContentGenerationForm() {
     </div>
 
     {/* KHỐI 2: Chân Dung Khách Hàng (Persona) */}
-    <div className="p-6 rounded-xl shadow-md border-t-4 border-purple-500 bg-purple-50">
+    <div className="p-6 rounded-xl shadow-md border-t-4 border-white-500 bg-white-50">
         <h4 className="font-bold text-gray-800 uppercase mb-3 border-b pb-2">
             Chân Dung Khách Hàng (Persona)
         </h4>
         <pre className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap font-sans bg-white p-3 rounded-md border shadow-inner">
             {analysisData.target_persona}
         </pre>
-    </div>
-    
+    </div>    
     {/* KHỐI 3 MỚI: Thông số Sản phẩm (Infor) */}
     {/* Giả định trường dữ liệu mới là analysisData.product_info_details */}
     <div className="p-6 rounded-xl shadow-md border-t-4 border-orange-500 bg-orange-50">
@@ -265,7 +266,6 @@ function ContentGenerationForm() {
         </pre>
     </div>
 </div>
-
             <button
               onClick={() => setCurrentStep(3)}
               className="mt-6 w-full flex items-center justify-center bg-green-600 text-white font-extrabold py-3 rounded-lg text-xl hover:bg-green-700 transition duration-300 shadow-lg shadow-green-400/50"
@@ -294,12 +294,10 @@ function ContentGenerationForm() {
       <h3 className="text-3xl font-extrabold text-gray-900 mb-6">
         GIAI ĐOẠN 2 & 3: Sáng Tạo Nội Dung & Media ✨
       </h3>
-
       <p className="text-gray-600 mb-8 border-l-4 border-indigo-400 pl-4 italic bg-indigo-50 p-4 rounded-md">
         Sử dụng ma trận **USP x Persona x Tone x Format** để tạo nội dung và sau
         đó sản xuất Poster.
       </p>
-
       {/* Form Chọn Biến Số Marketing (Giai đoạn 2 Input) */}
       <form
         onSubmit={handleContentGeneration}
@@ -343,27 +341,8 @@ function ContentGenerationForm() {
               ))}
             </select>
           </div>
-
           {/* Chọn Tone */}
-          <div className="col-span-1 md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              3. Chọn Giọng Điệu (Tone)
-            </label>
-            <select
-              value={selectedTone}
-              onChange={(e) => setSelectedTone(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-blue-300"
-              required
-            >
-              {ToneOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
-
         <button
           type="submit"
           disabled={loading}
@@ -373,7 +352,14 @@ function ContentGenerationForm() {
               : "bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-400/50"
           }`}
         >
-          {loading ? "Đang Sáng Tạo Nội Dung AI..." : "TẠO NỘI DUNG MARKETING"}
+                    {loading ? (
+            <div className="flex items-center gap-2 text-white-500 font-semibold">
+              <span className="animate-spin h-5 w-5 border-4 border-white-500 border-t-transparent rounded-full"></span>
+              <span>Đang Sáng Tạo Nội Dung AI...</span>
+            </div>
+          ) : (
+            <span className="text-gray-800 font-semibold">TẠO NỘI DUNG MARKETING</span>
+          )}
         </button>
       </form>
 
@@ -412,9 +398,14 @@ function ContentGenerationForm() {
                 : "bg-orange-600 text-white hover:bg-orange-700 shadow-lg shadow-orange-400/50"
             }`}
           >
-            {isGeneratingImage
-              ? "ĐANG TẠO POSTER AI..."
-              : "BẮT ĐẦU GIAI ĐOẠN 3: TẠO POSTER"}
+                            {isGeneratingImage ? (
+                <div className="flex items-center gap-2 text-white-500 font-semibold">
+                  <span className="animate-spin h-5 w-5 border-4 border-white-500 border-t-transparent rounded-full"></span>
+                  <span>ĐANG TẠO POSTER AI...</span>
+                </div>
+              ) : (
+                <span className="text-gray-800 font-semibold">BẮT ĐẦU GIAI ĐOẠN 3: TẠO POSTER</span>
+              )}
           </button>
         </div>
       )}

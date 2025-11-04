@@ -1,5 +1,4 @@
 // src/components/AnalysisResult.jsx
-
 import React from "react";
 
 function AnalysisResult({ data, onNextPhase }) {
