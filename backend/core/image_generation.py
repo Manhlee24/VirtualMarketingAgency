@@ -11,6 +11,13 @@ try:
 except Exception:
     Image = None
 
+try:
+    import cloudinary
+    import cloudinary.uploader
+    import time
+except Exception as e:
+    print(f"Warning: Optional module import failed: {e}")
+
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -32,9 +39,19 @@ try:
 except Exception:
     openai_client = None
 
+# Cấu hình Cloudinary sau load_dotenv()
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"), 
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True
+)
+
+# Cập nhật model response
 class ImageGenerationResponse(BaseModel):
     image_url: str = Field(..., description="URL công khai hoặc Data URL Base64 chứa ảnh Poster đã tạo.")
     prompt_used: str = Field(..., description="Prompt đã sử dụng để tạo ảnh.")
+    reference_url: Optional[str] = Field(None, description="URL ảnh tham khảo trên Cloudinary")
 
 def _expand_style_with_gemini(style_short: str, product_name: str, infor: str, target_persona: str, selected_usp: str, ad_copy: str) -> Optional[str]:
     """
@@ -77,13 +94,14 @@ def generate_marketing_poster(
     size: str = "1024x1024",
     n_images: int = 1
 ) -> Optional[ImageGenerationResponse]:
-    """
-    Sinh prompt cuối cùng:
-    - Nếu user không nhập style_short -> dùng base_prompt.
-    - Nếu user nhập style_short và Gemini trả về prompt mở rộng -> CHỈ dùng prompt mở rộng.
-    - Nếu user nhập style_short nhưng Gemini không trả về (None) -> fallback về base_prompt.
-    """
     try:
+        # Upload ảnh tham khảo lên Cloudinary nếu có
+        reference_url = None
+        if reference_image_bytes:
+            reference_url = upload_to_cloudinary(reference_image_bytes)
+            print(f"Đã upload ảnh tham khảo lên Cloudinary: {reference_url}")
+
+        # Tạo base prompt như cũ
         base_prompt = f"""
 Create a premium, high-quality digital advertising poster for {product_name}.
 Product details: {infor}
@@ -97,26 +115,23 @@ Requirements:
 - No text overlays in the image itself (UI/text will be added separately).
 """.strip()
 
-        # Nếu user có nhập style ngắn -> cố gắng mở rộng bằng Gemini
+        # Xử lý detailed style như cũ
         detailed_style = None
         if style_short:
             detailed_style = _expand_style_with_gemini(style_short, product_name, infor, persona, usp, ad_copy)
 
-        # Quy tắc chọn final_prompt:
-        # - Nếu có style_short và detailed_style không rỗng -> chỉ dùng detailed_style
-        # - Ngược lại -> dùng base_prompt
+        # Chọn prompt chính
         if style_short and detailed_style:
             final_prompt = detailed_style.strip()
-            # (tùy chọn) thêm context ngắn về sản phẩm vào cuối prompt mở rộng để giữ thông tin cần thiết
             final_prompt = final_prompt + f"\n\nProduct context: {product_name}. Key info: {infor}. USP: {usp}."
         else:
             final_prompt = base_prompt
 
-        # Nếu có ảnh tham khảo, thêm 1 câu ngắn (không chèn base64 lớn)
-        if reference_image_bytes:
-            final_prompt += "\n\nNote: A reference image was provided — use its composition, color palette and materials as inspiration."
+        # Thêm reference image URL vào prompt nếu upload thành công
+        if reference_url:
+            final_prompt += f"\n\nReference image URL: {reference_url}\nUse this image as visual inspiration for composition, color palette, lighting and materials."
 
-        # Nếu có OpenAI client thì gọi Images API
+        # Gọi OpenAI API
         if openai_client:
             try:
                 print("Calling OpenAI Images API (gpt-image-1)...")
@@ -130,28 +145,79 @@ Requirements:
                     size=size,
                     n=n_images,
                 )
-                # parse response
                 if resp and getattr(resp, "data", None) and len(resp.data) > 0:
                     result_data = resp.data[0]
-                    # url
                     url = getattr(result_data, "url", None)
                     if url:
-                        return ImageGenerationResponse(image_url=url, prompt_used=final_prompt)
-                    # base64 field
+                        return ImageGenerationResponse(
+                            image_url=url, 
+                            prompt_used=final_prompt,
+                            reference_url=reference_url  # Trả về reference_url trong response
+                        )
+
+                    # Nếu engine trả base64 (b64_json / b64) -> decode và upload lên Cloudinary
                     b64 = getattr(result_data, "b64_json", None) or getattr(result_data, "b64", None)
                     if b64:
-                        data_url = f"data:image/png;base64,{b64}"
-                        return ImageGenerationResponse(image_url=data_url, prompt_used=final_prompt)
+                        try:
+                            img_bytes = base64.b64decode(b64)
+                            uploaded_url = upload_to_cloudinary(img_bytes, public_id_prefix="generated_poster")
+                            if uploaded_url:
+                                return ImageGenerationResponse(
+                                    image_url=uploaded_url,
+                                    prompt_used=final_prompt,
+                                    reference_url=reference_url
+                                )
+                            # nếu upload thất bại -> fallback trả data URL
+                            data_url = f"data:image/png;base64,{b64}"
+                            return ImageGenerationResponse(
+                                image_url=data_url,
+                                prompt_used=final_prompt,
+                                reference_url=reference_url
+                            )
+                        except Exception as e:
+                            print(f"Warning: failed to upload generated image to Cloudinary: {e}")
+                            # fallback trả data URL
+                            data_url = f"data:image/png;base64,{b64}"
+                            return ImageGenerationResponse(
+                                image_url=data_url,
+                                prompt_used=final_prompt,
+                                reference_url=reference_url
+                            )
+
                 raise Exception("Image API returned no usable image data.")
             except Exception as e:
                 print(f"OpenAI Images error: {e}")
-                # fallthrough to mock
 
-        # fallback: trả mock placeholder (an toàn)
+        # Fallback to mock
         placeholder = "https://via.placeholder.com/1024x1024.png?text=Generated+Poster+Mock"
-        return ImageGenerationResponse(image_url=placeholder, prompt_used=final_prompt)
+        return ImageGenerationResponse(
+            image_url=placeholder, 
+            prompt_used=final_prompt,
+            reference_url=reference_url  # Vẫn trả về reference_url ngay cả khi dùng mock
+        )
     except Exception as e:
         err = str(e)
         print(f"Error in generate_marketing_poster: {err}")
         placeholder = "https://via.placeholder.com/1024x1024.png?text=ERROR"
-        return ImageGenerationResponse(image_url=placeholder, prompt_used=f"ERROR: {err}")
+        return ImageGenerationResponse(
+            image_url=placeholder, 
+            prompt_used=f"ERROR: {err}",
+            reference_url=None
+        )
+
+# Thêm hàm upload Cloudinary
+def upload_to_cloudinary(image_bytes: bytes, public_id_prefix: str = "ref") -> Optional[str]:
+    """Upload ảnh lên Cloudinary và trả về public URL."""
+    try:
+        with BytesIO(image_bytes) as img_buffer:
+            # Upload với public_id tự động
+            response = cloudinary.uploader.upload(
+                img_buffer,
+                folder="marketing_agency/references", # Thư mục lưu trữ
+                public_id=f"{public_id_prefix}_{int(time.time())}", # Tên file unique
+                resource_type="auto"
+            )
+            return response.get('secure_url')
+    except Exception as e:
+        print(f"Lỗi upload Cloudinary: {e}")
+        return None

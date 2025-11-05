@@ -1,11 +1,11 @@
 # backend/api/router.py
 
-from fastapi import APIRouter, HTTPException, Query, Form, UploadFile, File
+from fastapi import APIRouter, HTTPException, Form, UploadFile, File
 from models.product import ProductAnalysisRequest, ProductAnalysisResult
 from models.content import ContentGenerationRequest, GeneratedContentResponse
 from core.data_analysis import analyze_product_data
 from core.content_generation import generate_marketing_content
-from core.image_generation import generate_marketing_poster, ImageGenerationResponse
+from core.image_generation import generate_marketing_poster, ImageGenerationResponse, upload_to_cloudinary
 
 router = APIRouter(prefix="/v1")
 
@@ -66,7 +66,7 @@ async def generate_poster(
     usp: str = Form(..., description="USP đang được tập trung."),
     infor: str = Form(..., description="Các thông số sản phẩm nổi bật."),
     style_short: str = Form(None, description="Yêu cầu phong cách ngắn (tuỳ chọn)."),
-    reference_image: UploadFile = File(None, description="Hình ảnh tham khảo (tùy chọn)")
+    reference_image: UploadFile = File  (None, description="Hình ảnh tham khảo (tùy chọn)")
 ):
     """
     Endpoint Giai đoạn 3: Nhận các thông số và Ad Copy để tạo Poster/Ảnh quảng cáo.
@@ -96,3 +96,36 @@ async def generate_poster(
         raise HTTPException(status_code=500, detail=msg)
     # Trả về lỗi nếu không tạo được ảnh
     raise HTTPException(status_code=400, detail="Không thể tạo Poster, vui lòng kiểm tra log backend.")
+
+@router.post("/test_upload")
+async def test_upload(image: UploadFile = File(...)):
+    """
+    Endpoint test để upload ảnh lên Cloudinary.
+    Cách dùng với curl:
+    curl -X POST "http://localhost:8000/api/v1/test_upload" -H "accept: application/json" -F "image=@/path/to/your/image.jpg"
+    """
+    try:
+        # Đọc file bytes
+        contents = await image.read()
+        
+        # Upload lên Cloudinary
+        cloudinary_url = upload_to_cloudinary(contents, "test")
+        
+        if cloudinary_url:
+            return {
+                "status": "success",
+                "message": "Upload thành công",
+                "cloudinary_url": cloudinary_url,
+                "filename": image.filename
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Không thể upload lên Cloudinary"
+            )
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lỗi khi upload: {str(e)}"
+        )
