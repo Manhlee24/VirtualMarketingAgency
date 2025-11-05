@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
-from schemas.auth import UserCreate,UserLogin,UserOut, Token
+from schemas.auth import UserCreate, UserLogin, UserOut, Token, TokenLogin
 from models.user import User
 from db import get_db, init_db
 from core.auth import get_password_hash, verify_password, create_access_token
@@ -41,11 +41,12 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    access_token = create_access_token({"user_id": user.email}, expires_delta=timedelta(minutes=60 * 24))
-    return {"access_token": access_token, "token_type": "bearer","message":"Đăng kí thành công!"}
+    access_token = create_access_token(
+        {"user_id": user.email}, expires_delta=timedelta(minutes=60 * 24))
+    return {"access_token": access_token, "token_type": "bearer", "message": "Đăng kí thành công!"}
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=TokenLogin)
 def login(form_data: UserLogin, db: Session = Depends(get_db)):
     """Simple login that returns a JWT when credentials are valid.
 
@@ -53,7 +54,9 @@ def login(form_data: UserLogin, db: Session = Depends(get_db)):
     """
     user = db.query(User).filter(User.email == form_data.email).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    access_token = create_access_token({"user_id": user.email}, expires_delta=timedelta(minutes=60 * 24))
-    return {"access_token": access_token, "token_type": "bearer","message":"Đăng nhập thành công!"}
+    access_token = create_access_token(
+        {"user_id": user.email}, expires_delta=timedelta(minutes=60 * 24))
+    return {"access_token": access_token, "token_type": "bearer", "message": "Đăng nhập thành công!", "name": user.name}

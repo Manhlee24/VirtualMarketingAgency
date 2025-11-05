@@ -23,7 +23,11 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     message:str
-
+class TokenLogin(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    message:str
+    name:str
 
 class TokenData(BaseModel):
     user_id: Optional[int] = None
