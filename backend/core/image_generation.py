@@ -1,9 +1,14 @@
 import os
 import base64
-from pydantic import BaseModel, Field
-from dotenv import load_dotenv
+import logging
+from models.schemas import ImageGenerationResponse
 from typing import Optional
 from io import BytesIO
+from core.ai_clients import get_gemini_client, get_openai_client, OPENAI_API_KEY, GEMINI_API_KEY
+
+# setup basic logger
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 # optional imports
 try:
@@ -16,28 +21,10 @@ try:
     import cloudinary.uploader
     import time
 except Exception as e:
-    print(f"Warning: Optional module import failed: {e}")
+    logger.info("Optional module import failed: %s", e)
 
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-
-# Gemini client (optional)
-try:
-    from google import generativeai as genai
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')  # Dùng gemini-pro thay vì gemini-2.5-flash
-    gemini_client = model if GEMINI_API_KEY else None
-except Exception as e:
-    print(f"Failed to initialize Gemini: {e}")
-    gemini_client = None
-
-# OpenAI client (optional, dùng SDK mới)
-try:
-    from openai import OpenAI
-    openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-except Exception:
-    openai_client = None
+gemini_client = get_gemini_client()
+openai_client = get_openai_client()
 
 # Cấu hình Cloudinary sau load_dotenv()
 cloudinary.config(
@@ -47,177 +34,248 @@ cloudinary.config(
     secure=True
 )
 
-# Cập nhật model response
-class ImageGenerationResponse(BaseModel):
-    image_url: str = Field(..., description="URL công khai hoặc Data URL Base64 chứa ảnh Poster đã tạo.")
-    prompt_used: str = Field(..., description="Prompt đã sử dụng để tạo ảnh.")
-    reference_url: Optional[str] = Field(None, description="URL ảnh tham khảo trên Cloudinary")
+# Log availability of keys/clients
+logger.info("GEMINI_API_KEY present: %s", bool(GEMINI_API_KEY))
+logger.info("gemini_client available: %s", bool(gemini_client))
+logger.info("OPENAI_API_KEY present: %s", bool(OPENAI_API_KEY))
+logger.info("openai_client available: %s", bool(openai_client))
+logger.info("Cloudinary configured: %s", bool(os.getenv("CLOUDINARY_CLOUD_NAME")))
 
-def _expand_style_with_gemini(style_short: str, product_name: str, infor: str, target_persona: str, selected_usp: str, ad_copy: str) -> Optional[str]:
+# Cập nhật model response
+ 
+
+def _expand_style_with_gemini(style_short: str, infor: str, selected_usp: str, ad_copy: str) -> Optional[str]:
     """
-    Gọi Gemini 'gemini-2.5-flash' để mở rộng một yêu cầu phong cách ngắn thành prompt chi tiết.
-    Trả về chuỗi prompt chi tiết hoặc None nếu thất bại.
+    Gọi Gemini để mở rộng yêu cầu chỉnh sửa/thay đổi ngắn thành prompt chi tiết (cho editing/inpainting).
     """
     if not style_short:
         return None
 
     instruction = (
-        f"You are an expert prompt engineer for image generation. Expand the short style request below into a\n"
-        f"detailed image-generation prompt suitable for photorealistic advertising posters.\n"
-        f"Include composition, camera angle, focal length, lighting, color palette, materials/textures, mood, and stylistic keywords.\n"
-        f"include key product higtlight with {infor} adding text overlays or UI. Output only the detailed prompt.\n\n"
-        f"Short style request: {style_short}\n\n"
-        f"Product context:\n"
-        f"- Product: {product_name}\n"
-        f"- Example ad copy: {ad_copy}\n"
-        f"- Note: limit 100 words"
+        f"You are an expert prompt engineer for image editing (inpainting). The user wants to edit an existing image.\n"
+        f"Expand the short style request below into a **detailed, concise prompt** (limit 100 words) describing the **exact new content and style** to be rendered in the masked area of the image.\n"
+        f"Focus on the desired output's composition, camera angle, lighting, color palette, and textures, relative to the existing image.\n"
+        f"Key product highlight: {infor}. Ad copy focus: {ad_copy}.\n\n"
+        f"Short style request/desired change: {style_short}\n\n"
+        f"Output only the detailed editing prompt, limited to 100 words."
     )
 
-    try:
-        if gemini_client:
-            response = gemini_client.generate_content(instruction)
-            return response.text.strip()
-    except Exception as e:
-        print(f"Warning: gemini_client.responses.create failed: {e}")
+    if not style_short:
+        return None
 
-    print("Info: Gemini expansion not available. Skipping style expansion.")
+    if not gemini_client:
+        logger.info("No gemini_client available; skipping Gemini expansion.")
+        return None
+
+    # Try several possible method names and response shapes because different
+    # versions of the google-genai package expose different client APIs.
+    candidates = [
+        "generate_content",
+        "generate",
+        "generate_text",
+        "text_generation",
+        "create",
+    ]
+
+    last_exc = None
+    for method_name in candidates:
+        try:
+            if hasattr(gemini_client, method_name):
+                method = getattr(gemini_client, method_name)
+                logger.info("Calling gemini_client.%s(...) for style expansion", method_name)
+                resp = method(instruction)
+
+                # Try to extract text from common response shapes
+                if resp is None:
+                    logger.warning("Gemini method %s returned None", method_name)
+                    continue
+
+                # Common attribute: text
+                if hasattr(resp, "text"):
+                    text = getattr(resp, "text")
+                    if text:
+                        return text.strip()
+
+                # Some clients return a dict-like or object with 'candidates' or 'output'
+                try:
+                    # dict-like
+                    if isinstance(resp, dict):
+                        # e.g. {'candidates': [{'text': '...'}]}
+                        if "candidates" in resp and resp["candidates"]:
+                            c0 = resp["candidates"][0]
+                            if isinstance(c0, dict) and c0.get("text"):
+                                return c0.get("text").strip()
+                        if "output" in resp and isinstance(resp["output"], str):
+                            return resp["output"].strip()
+
+                    # object with attributes
+                    if hasattr(resp, "candidates") and getattr(resp, "candidates"):
+                        c0 = getattr(resp, "candidates")[0]
+                        if hasattr(c0, "text"):
+                            return getattr(c0, "text").strip()
+                    if hasattr(resp, "output") and isinstance(getattr(resp, "output"), str):
+                        return getattr(resp, "output").strip()
+                except Exception:
+                    # ignore extraction errors and continue trying other methods
+                    pass
+
+                # As a last resort, try str(resp) and use it if non-empty and not huge
+                try:
+                    s = str(resp)
+                    if s and len(s) < 2000:
+                        # clean up common wrappers
+                        return s.strip()
+                except Exception:
+                    pass
+
+        except AttributeError as ae:
+            # method not present or bound method failing
+            last_exc = ae
+            logger.debug("AttributeError calling gemini.%s: %s", method_name, ae)
+        except Exception as e:
+            last_exc = e
+            logger.warning("gemini_client.%s failed: %s", method_name, e)
+
+    # If we reach here, none of the methods produced usable text. Log diagnostic info.
+    try:
+        client_type = type(gemini_client)
+        client_dir = dir(gemini_client)
+        logger.warning("Gemini expansion not available. gemini_client type=%s; attrs=%s", client_type, client_dir)
+        if last_exc:
+            logger.warning("Last Gemini exception: %s", last_exc)
+    except Exception as e:
+        logger.warning("Failed to introspect gemini_client: %s", e)
+
+    logger.info("Gemini expansion not available. Skipping style expansion.")
     return None
 
-def generate_marketing_poster(
-    product_name: str,
-    ad_copy: str,
-    persona: str,
-    infor: str,
-    usp: str,
-    style_short: Optional[str] = None,
-    reference_image_bytes: Optional[bytes] = None,
-    size: str = "1024x1024",
-    n_images: int = 1
-) -> Optional[ImageGenerationResponse]:
-    try:
-        # Upload ảnh tham khảo lên Cloudinary nếu có
-        reference_url = None
-        if reference_image_bytes:
-            reference_url = upload_to_cloudinary(reference_image_bytes)
-            print(f"Đã upload ảnh tham khảo lên Cloudinary: {reference_url}")
-
-        # Tạo base prompt như cũ
-        base_prompt = f"""
-Create a premium, high-quality digital advertising poster for {product_name}.
-Product details: {infor}
-Target persona: {persona}
-USP: {usp}
-Ad copy sample: {ad_copy}
-
-Requirements:
-- Modern, minimalist, cinematic lighting.
-- Product centered, realistic materials and reflections.
-- No text overlays in the image itself (UI/text will be added separately).
-""".strip()
-
-        # Xử lý detailed style như cũ
-        detailed_style = None
-        if style_short:
-            detailed_style = _expand_style_with_gemini(style_short, product_name, infor, persona, usp, ad_copy)
-
-        # Chọn prompt chính
-        if style_short and detailed_style:
-            final_prompt = detailed_style.strip()
-            final_prompt = final_prompt + f"\n\nProduct context: {product_name}. Key info: {infor}. USP: {usp}."
-        else:
-            final_prompt = base_prompt
-
-        # Thêm reference image URL vào prompt nếu upload thành công
-        if reference_url:
-            final_prompt += f"\n\nReference image URL: {reference_url}\nUse this image as visual inspiration for composition, color palette, lighting and materials."
-
-        # Gọi OpenAI API
-        if openai_client:
-            try:
-                print("Calling OpenAI Images API (gpt-image-1)...")
-                allowed_sizes = {"1024x1024", "1024x1536", "1536x1024"}
-                if size not in allowed_sizes:
-                    size = "1024x1024"
-
-                resp = openai_client.images.generate(
-                    model="gpt-image-1",
-                    prompt=final_prompt,
-                    size=size,
-                    n=n_images,
-                )
-                if resp and getattr(resp, "data", None) and len(resp.data) > 0:
-                    result_data = resp.data[0]
-                    url = getattr(result_data, "url", None)
-                    if url:
-                        return ImageGenerationResponse(
-                            image_url=url, 
-                            prompt_used=final_prompt,
-                            reference_url=reference_url  # Trả về reference_url trong response
-                        )
-
-                    # Nếu engine trả base64 (b64_json / b64) -> decode và upload lên Cloudinary
-                    b64 = getattr(result_data, "b64_json", None) or getattr(result_data, "b64", None)
-                    if b64:
-                        try:
-                            img_bytes = base64.b64decode(b64)
-                            uploaded_url = upload_to_cloudinary(img_bytes, public_id_prefix="generated_poster")
-                            if uploaded_url:
-                                return ImageGenerationResponse(
-                                    image_url=uploaded_url,
-                                    prompt_used=final_prompt,
-                                    reference_url=reference_url
-                                )
-                            # nếu upload thất bại -> fallback trả data URL
-                            data_url = f"data:image/png;base64,{b64}"
-                            return ImageGenerationResponse(
-                                image_url=data_url,
-                                prompt_used=final_prompt,
-                                reference_url=reference_url
-                            )
-                        except Exception as e:
-                            print(f"Warning: failed to upload generated image to Cloudinary: {e}")
-                            # fallback trả data URL
-                            data_url = f"data:image/png;base64,{b64}"
-                            return ImageGenerationResponse(
-                                image_url=data_url,
-                                prompt_used=final_prompt,
-                                reference_url=reference_url
-                            )
-
-                raise Exception("Image API returned no usable image data.")
-            except Exception as e:
-                print(f"OpenAI Images error: {e}")
-
-        # Fallback to mock
-        placeholder = "https://via.placeholder.com/1024x1024.png?text=Generated+Poster+Mock"
-        return ImageGenerationResponse(
-            image_url=placeholder, 
-            prompt_used=final_prompt,
-            reference_url=reference_url  # Vẫn trả về reference_url ngay cả khi dùng mock
-        )
-    except Exception as e:
-        err = str(e)
-        print(f"Error in generate_marketing_poster: {err}")
-        placeholder = "https://via.placeholder.com/1024x1024.png?text=ERROR"
-        return ImageGenerationResponse(
-            image_url=placeholder, 
-            prompt_used=f"ERROR: {err}",
-            reference_url=None
-        )
-
-# Thêm hàm upload Cloudinary
 def upload_to_cloudinary(image_bytes: bytes, public_id_prefix: str = "ref") -> Optional[str]:
     """Upload ảnh lên Cloudinary và trả về public URL."""
     try:
         with BytesIO(image_bytes) as img_buffer:
-            # Upload với public_id tự động
             response = cloudinary.uploader.upload(
                 img_buffer,
-                folder="marketing_agency/references", # Thư mục lưu trữ
-                public_id=f"{public_id_prefix}_{int(time.time())}", # Tên file unique
+                folder="marketing_agency/references", 
+                public_id=f"{public_id_prefix}_{int(time.time())}", 
                 resource_type="auto"
             )
-            return response.get('secure_url')
+            url = response.get('secure_url')
+            logger.info("Uploaded to Cloudinary: %s", url)
+            return url
     except Exception as e:
-        print(f"Lỗi upload Cloudinary: {e}")
+        logger.warning("Cloudinary upload failed: %s", e)
         return None
+
+def generate_marketing_poster(
+    product_name: str,
+    ad_copy: str,
+    infor: str,
+    usp: str,
+    style_short: Optional[str] = None,
+    # Thêm ảnh gốc và tùy chọn mask
+    original_image_bytes: Optional[bytes] = None,
+    original_image_path: Optional[str] = None,
+    mask_image_bytes: Optional[bytes] = None, 
+    size: str = "1024x1024",
+    n_images: int = 1
+) -> Optional[ImageGenerationResponse]:
+    try:
+        # Kiểm tra ảnh gốc (bắt buộc cho Edit)
+        if not original_image_bytes:
+            logger.info("No original image bytes provided; returning mock placeholder.")
+            final_prompt = "No original image provided for editing."
+            placeholder = "https://via.placeholder.com/1024x1024.png?text=NO+IMAGE+FOR+EDIT"
+            return ImageGenerationResponse(
+                image_url=placeholder, 
+                prompt_used=final_prompt,
+                reference_url=None
+            )
+
+        # Xử lý detailed style (prompt mô tả thay đổi)
+        detailed_style = _expand_style_with_gemini(style_short or "", infor, usp, ad_copy)
+
+        # Chọn prompt chính
+        if detailed_style:
+            final_prompt = detailed_style.strip()
+        elif style_short:
+            final_prompt = style_short.strip()
+        else:
+            final_prompt = f"Edit the image to better reflect the product: {product_name} with key details: {infor}."
+
+        # Thêm thông tin context vào prompt cuối cùng
+        final_prompt = f"{final_prompt}. Product context: {product_name}. USP: {usp}."
+
+        # Gọi OpenAI Images Edit API
+        if openai_client:
+            try:
+                edit_model = "gpt-image-1"
+                logger.info("Calling OpenAI Images Edit API (%s)...", edit_model)
+
+                allowed_sizes = {"256x256", "512x512", "1024x1024"}
+                if size not in allowed_sizes:
+                    size = "1024x1024"
+
+                # Prepare image input: prefer path if provided (saved on disk), else use bytes
+                opened_file = None
+                try:
+                    if original_image_path:
+                        opened_file = open(original_image_path, "rb")
+                        image_input = opened_file
+                        logger.info("Using saved image path for OpenAI request: %s", original_image_path)
+                    else:
+                        image_input = BytesIO(original_image_bytes)
+
+                    mask_file = BytesIO(mask_image_bytes) if mask_image_bytes else None
+
+                    resp = openai_client.images.edit(
+                        model=edit_model,
+                        image=image_input,
+                        prompt=final_prompt,
+                        size=size,
+                        n=n_images,
+                        quality="medium",
+                    )
+
+                    if resp and getattr(resp, "data", None) and len(resp.data) > 0:
+                        result_data = resp.data[0]
+                        b64 = getattr(result_data, "b64_json", None)
+                        if b64:
+                            img_bytes = base64.b64decode(b64)
+                            uploaded_url = upload_to_cloudinary(img_bytes, public_id_prefix="edited_poster")
+                            if uploaded_url:
+                                return ImageGenerationResponse(
+                                    image_url=uploaded_url,
+                                    prompt_used=final_prompt,
+                                    reference_url=None,
+                                )
+                            data_url = f"data:image/png;base64,{b64}"
+                            return ImageGenerationResponse(
+                                image_url=data_url,
+                                prompt_used=final_prompt,
+                                reference_url=None,
+                            )
+
+                    raise Exception("Image API returned no usable image data.")
+                finally:
+                    if opened_file:
+                        opened_file.close()
+            except Exception as e:
+                logger.error("OpenAI Images Edit error: %s", e)
+                
+        # Fallback to mock (khi API client không khả dụng hoặc lỗi)
+        placeholder = "https://via.placeholder.com/1024x1024.png?text=EDIT+FAIL+MOCK"
+        return ImageGenerationResponse(
+            image_url=placeholder, 
+            prompt_used=final_prompt,
+            reference_url=None
+        )
+        
+    except Exception as e:
+        err = str(e)
+        logger.error("Error in generate_marketing_poster: %s", err)
+        placeholder = "https://via.placeholder.com/1024x1024.png?text=CRITICAL+ERROR"
+        return ImageGenerationResponse(
+            image_url=placeholder, 
+            prompt_used=f"CRITICAL ERROR: {err}",
+            reference_url=None
+        )
