@@ -7,8 +7,8 @@ import { ToneOptions, FormatOptions } from "../utils/constants.jsx";
 // --- 1. HELPER FUNCTIONS ---
 
 const formatContent = (content) => {
-  // Thay thế các dòng mới thành <br> cho hiển thị
   return content.split("\n").map((line, index) => (
+  // Thay thế các dòng mới thành <br> cho hiển thị
     <React.Fragment key={index}>
       {line}
       <br />
