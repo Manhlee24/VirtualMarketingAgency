@@ -1,18 +1,7 @@
-import os
 import json
-from google import genai
 from google.genai import types
-from dotenv import load_dotenv
-from models.product import ProductAnalysisResult
-
-# Tải biến môi trường
-load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY không được tìm thấy. Vui lòng tạo file .env.")
-client = genai.Client(api_key=GEMINI_API_KEY)
-
+from models.schemas import ProductAnalysisResult
+from core.ai_clients import get_gemini_client, GEMINI_API_KEY
 
 def analyze_product_data(product_name: str) -> ProductAnalysisResult | None:
     """
@@ -37,16 +26,25 @@ with the following keys: 'usps' (list of strings), 'pain_points' (list of string
     """
 
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                tools=[{"google_search": {}}] # Kích hoạt công cụ tìm kiếm
+        client = get_gemini_client()
+        if not client or not GEMINI_API_KEY:
+            return None
+        response = None
+        cfg = types.GenerateContentConfig(tools=[{"google_search": {}}]) if hasattr(types, "GenerateContentConfig") else None
+        print("cfg: " + cfg)
+        if hasattr(client, "models") and hasattr(client.models, "generate_content"):
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+                config=cfg
             )
-        )
+            print("response of gemini-2.5-flash")
+        elif hasattr(client, "generate_content"):
+            # Fallback without tools config
+            response = client.generate_content(prompt)
         
         # 1. KIỂM TRA NỘI DUNG PHẢN HỒI (KHẮC PHỤC 'NoneType' object has no attribute 'strip')
-        if not response.text:
+        if not response or not getattr(response, "text", None):
             print(f"Gemini API không trả về nội dung văn bản cho sản phẩm: {product_name}")
             return None
             
