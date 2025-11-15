@@ -1,15 +1,6 @@
-import os
-from google import genai
-from google.genai import types
-from dotenv import load_dotenv
-from models.content import ContentGenerationRequest, GeneratedContentResponse
-
-load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY không được tìm thấy. Vui lòng tạo file .env.")
-client = genai.Client(api_key=GEMINI_API_KEY)
+import json
+from models.schemas import ContentGenerationRequest, GeneratedContentResponse
+from core.ai_clients import get_gemini_client, GEMINI_API_KEY
 
 
 def generate_marketing_content(request: ContentGenerationRequest) -> GeneratedContentResponse | None:
@@ -47,16 +38,17 @@ The output must be a single, valid JSON object (no additional text outside the J
     """
 
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt
-        )
-        
-        if not response.text:
+        client = get_gemini_client()
+        if not client or not GEMINI_API_KEY:
             return None
-        
-        # Xử lý và phân tích JSON
-        import json
+        # Try modern client method
+        response = None
+        if hasattr(client, "models") and hasattr(client.models, "generate_content"):
+            response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        elif hasattr(client, "generate_content"):
+            response = client.generate_content(prompt)
+        if not response or not getattr(response, "text", None):
+            return None
         json_text = response.text.strip().replace("```json", "").replace("```", "").strip()
         data = json.loads(json_text)
         
