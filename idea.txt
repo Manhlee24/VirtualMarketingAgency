@@ -3,3 +3,4 @@ them tinh nang nhap anh
 tao ra nhieu loai bai vite
 tao ra video ngan
 lich su cua ng dung
+nguoi dung gui tai lieu là file pdf, word, scan nó.

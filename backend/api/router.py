@@ -1,4 +1,4 @@
-# backend/api/router.py
+
 
 from fastapi import APIRouter, HTTPException, Form, UploadFile, File
 from models.product import ProductAnalysisRequest, ProductAnalysisResult
@@ -9,9 +9,7 @@ from core.image_generation import generate_marketing_poster, ImageGenerationResp
 
 router = APIRouter(prefix="/v1")
 
-# ===============================================
 # GIAI ĐOẠN 1: PHÂN TÍCH DỮ LIỆU THỊ TRƯỜNG
-# ===============================================
 
 @router.post("/analyze_product", response_model=ProductAnalysisResult)
 def analyze_product(request: ProductAnalysisRequest):
@@ -25,16 +23,12 @@ def analyze_product(request: ProductAnalysisRequest):
             return result
     except Exception as e:
         print(f"Lỗi phân tích dữ liệu ở Giai đoạn 1: {e}")
-        # Trả về kết quả rỗng và thông báo lỗi 500 nếu có lỗi nghiêm trọng
         raise HTTPException(status_code=500, detail=f"Lỗi Server: Không thể phân tích sản phẩm. Lỗi chi tiết: {str(e)}")
         
-    # Trả về kết quả rỗng (200 OK) nếu AI không tìm thấy dữ liệu
     return ProductAnalysisResult(product_name=request.product_name, usps=[], pain_points=[], infor="Khong tim thay du lieu", target_persona="Không tìm thấy dữ liệu.")
 
 
-# ===============================================
 # GIAI ĐOẠN 2: SÁNG TẠO NỘI DUNG MARKETING
-# ===============================================
 
 @router.post("/generate_content", response_model=GeneratedContentResponse)
 def generate_content(request: ContentGenerationRequest):
@@ -49,14 +43,9 @@ def generate_content(request: ContentGenerationRequest):
     except Exception as e:
         print(f"Lỗi tạo nội dung ở Giai đoạn 2: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi Server: Không thể tạo nội dung. Lỗi chi tiết: {str(e)}")
-
-    # Trả về lỗi nếu không tạo được nội dung
     raise HTTPException(status_code=400, detail="Không thể tạo nội dung, vui lòng thử lại với các thông số khác.")
 
-
-# ===============================================
 # GIAI ĐOẠN 3: SẢN XUẤT MEDIA (POSTER)
-# ===============================================
 
 @router.post("/generate_poster", response_model=ImageGenerationResponse)
 async def generate_poster(
@@ -77,7 +66,6 @@ async def generate_poster(
         ref_bytes = None
         if reference_image:
             ref_bytes = await reference_image.read()
-        # gọi hàm core (trả về ImageGenerationResponse)
         result = generate_marketing_poster(
             product_name=product_name,
             ad_copy=ad_copy,
@@ -90,11 +78,9 @@ async def generate_poster(
         if result:
             return result
     except Exception as e:
-        # đảm bảo trả chuỗi, không trả object
         msg = str(e)
         print(f"Lỗi tạo Poster ở Giai đoạn 3: {msg}")
         raise HTTPException(status_code=500, detail=msg)
-    # Trả về lỗi nếu không tạo được ảnh
     raise HTTPException(status_code=400, detail="Không thể tạo Poster, vui lòng kiểm tra log backend.")
 
 @router.post("/test_upload")
@@ -105,10 +91,7 @@ async def test_upload(image: UploadFile = File(...)):
     curl -X POST "http://localhost:8000/api/v1/test_upload" -H "accept: application/json" -F "image=@/path/to/your/image.jpg"
     """
     try:
-        # Đọc file bytes
         contents = await image.read()
-        
-        # Upload lên Cloudinary
         cloudinary_url = upload_to_cloudinary(contents, "test")
         
         if cloudinary_url:

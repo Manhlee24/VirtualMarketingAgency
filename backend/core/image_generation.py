@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from typing import Optional
 from io import BytesIO
 
-# optional imports
 try:
     from PIL import Image
 except Exception:
@@ -22,24 +21,21 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Gemini client (optional)
 try:
     from google import generativeai as genai
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')  # Dùng gemini-pro thay vì gemini-2.5-flash
+    model = genai.GenerativeModel('gemini-2.5-flash') 
     gemini_client = model if GEMINI_API_KEY else None
 except Exception as e:
     print(f"Failed to initialize Gemini: {e}")
     gemini_client = None
 
-# OpenAI client (optional, dùng SDK mới)
 try:
     from openai import OpenAI
     openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 except Exception:
     openai_client = None
 
-# Cấu hình Cloudinary sau load_dotenv()
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"), 
@@ -100,8 +96,6 @@ def generate_marketing_poster(
         if reference_image_bytes:
             reference_url = upload_to_cloudinary(reference_image_bytes)
             print(f"Đã upload ảnh tham khảo lên Cloudinary: {reference_url}")
-
-        # Tạo base prompt như cũ
         base_prompt = f"""
 Create a premium, high-quality digital advertising poster for {product_name}.
 Product details: {infor}
@@ -115,7 +109,6 @@ Requirements:
 - No text overlays in the image itself (UI/text will be added separately).
 """.strip()
 
-        # Xử lý detailed style như cũ
         detailed_style = None
         if style_short:
             detailed_style = _expand_style_with_gemini(style_short, product_name, infor, persona, usp, ad_copy)
@@ -129,7 +122,12 @@ Requirements:
 
         # Thêm reference image URL vào prompt nếu upload thành công
         if reference_url:
-            final_prompt += f"\n\nReference image URL: {reference_url}\nUse this image as visual inspiration for composition, color palette, lighting and materials."
+            final_prompt += (
+                f"\n\nReference image URL: {reference_url}\n"
+                "IMPORTANT: Use the EXACT product shown in the reference image as the main subject. "
+                "Match the product's shape, proportions, colors, materials and any visible labels or branding. "
+                "Do not replace or invent a different product. You may change background, lighting, camera angle and styling to match the requested style."
+            )
 
         # Gọi OpenAI API
         if openai_client:
@@ -152,7 +150,7 @@ Requirements:
                         return ImageGenerationResponse(
                             image_url=url, 
                             prompt_used=final_prompt,
-                            reference_url=reference_url  # Trả về reference_url trong response
+                            reference_url=reference_url
                         )
 
                     # Nếu engine trả base64 (b64_json / b64) -> decode và upload lên Cloudinary
@@ -176,7 +174,6 @@ Requirements:
                             )
                         except Exception as e:
                             print(f"Warning: failed to upload generated image to Cloudinary: {e}")
-                            # fallback trả data URL
                             data_url = f"data:image/png;base64,{b64}"
                             return ImageGenerationResponse(
                                 image_url=data_url,
@@ -193,7 +190,7 @@ Requirements:
         return ImageGenerationResponse(
             image_url=placeholder, 
             prompt_used=final_prompt,
-            reference_url=reference_url  # Vẫn trả về reference_url ngay cả khi dùng mock
+            reference_url=reference_url 
         )
     except Exception as e:
         err = str(e)
@@ -210,11 +207,10 @@ def upload_to_cloudinary(image_bytes: bytes, public_id_prefix: str = "ref") -> O
     """Upload ảnh lên Cloudinary và trả về public URL."""
     try:
         with BytesIO(image_bytes) as img_buffer:
-            # Upload với public_id tự động
             response = cloudinary.uploader.upload(
                 img_buffer,
-                folder="marketing_agency/references", # Thư mục lưu trữ
-                public_id=f"{public_id_prefix}_{int(time.time())}", # Tên file unique
+                folder="marketing_agency/references",
+                public_id=f"{public_id_prefix}_{int(time.time())}",
                 resource_type="auto"
             )
             return response.get('secure_url')

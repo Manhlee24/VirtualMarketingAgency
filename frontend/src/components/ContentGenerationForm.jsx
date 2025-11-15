@@ -61,27 +61,42 @@ function ContentGenerationForm() {
     e.preventDefault();
     if (!productName) return;
 
+    // Reset ALL states before new analysis
     setLoading(true);
     setAnalysisData(null);
     setError(null);
+    
+    // Reset Phase 2 states
+    setSelectedUsp("");
+    setSelectedTone(ToneOptions[0].value);
+    setSelectedFormat(FormatOptions[0].value);
+    setGeneratedContent(null);
+    
+    // Reset Phase 3 states
+    setGeneratedPoster(null);
+    setIsGeneratingImage(false);
+    setImageError(null);
+    setStyleShort("");
+    setReferenceImageFile(null);
+    setReferenceImagePreview(null);
 
     try {
-      const response = await axios.post(`${BASE_URL}/analyze_product`, {
-        product_name: productName,
-      });
-      const data = response.data;
+        const response = await axios.post(`${BASE_URL}/analyze_product`, {
+            product_name: productName,
+        });
+        const data = response.data;
 
-      setAnalysisData(data);
-      setCurrentStep(2);
+        setAnalysisData(data);
+        setCurrentStep(2);
 
-      if (data.usps && data.usps.length > 0) {
-        setSelectedUsp(data.usps[0]);
-      }
+        if (data.usps && data.usps.length > 0) {
+            setSelectedUsp(data.usps[0]);
+        }
     } catch (err) {
-      console.error("Lỗi khi gọi API phân tích:", err);
-      setError("Lỗi: Không thể phân tích sản phẩm. Kiểm tra Server Backend.");
+        console.error("Lỗi khi gọi API phân tích:", err);
+        setError("Lỗi: Không thể phân tích sản phẩm. Kiểm tra Server Backend.");
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 

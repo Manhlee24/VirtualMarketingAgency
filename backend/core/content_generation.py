@@ -4,7 +4,6 @@ from google.genai import types
 from dotenv import load_dotenv
 from models.content import ContentGenerationRequest, GeneratedContentResponse
 
-# Tải biến môi trường
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
@@ -44,7 +43,7 @@ The output must be a single, valid JSON object (no additional text outside the J
 
 "title": (String) An engaging title suitable for the chosen format.
 
-"content": (String) The detailed article/script content.
+"content": (String) The detailed article/script content about 200 words.
     """
 
     try:
