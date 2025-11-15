@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 from core.data_analysis import analyze_product_data
 from core.content_generation import generate_marketing_content
-from core.document_analysis import generate_marketing_from_document
+from core.document_analysis import generate_product_analysis_from_document
 from core.image_generation import generate_marketing_poster
 from models.schemas import (
     ProductAnalysisRequest,
@@ -41,13 +41,15 @@ def analyze_product(request: ProductAnalysisRequest):
     return ProductAnalysisResult(product_name=request.product_name, usps=[], pain_points=[], infor="Khong tim thay du lieu", target_persona="Không tìm thấy dữ liệu.")
 
 
-@router.post("/analyze_document", response_model=GeneratedContentResponse)
+@router.post("/analyze_document", response_model=ProductAnalysisResult)
 async def analyze_document(
-    product_name: str = Form(..., description="Tên sản phẩm."),
+    product_name: str = Form(None, description="Tên sản phẩm (tùy chọn, có thể tự suy luận từ tài liệu)."),
     document: UploadFile = File(..., description="PDF or DOCX document containing product info")
 ):
     """
-    Upload a PDF or DOCX document and generate marketing content (title + content) using Gemini.
+    Upload a PDF or DOCX document and analyze its content to extract structured product
+    analysis (usps, pain_points, target_persona, infor) suitable for downstream
+    marketing generation. Returns a ProductAnalysisResult.
     """
     logger.info("analyze_document called for product: %s, filename: %s", product_name, getattr(document, 'filename', None))
     try:
@@ -62,12 +64,13 @@ async def analyze_document(
             # try to guess or return error
             raise HTTPException(status_code=400, detail="Unsupported file type. Please upload a .pdf or .docx file.")
 
-        # Generate marketing content from the uploaded document
-        result = generate_marketing_from_document(product_name, contents, file_type)
+        # Generate structured product analysis from the uploaded document
+        result = generate_product_analysis_from_document(product_name or "", contents, file_type)
         if result:
             return result
         else:
-            raise HTTPException(status_code=500, detail="Document-to-marketing generation failed. Check server logs for details.")
+            # Return an empty-but-valid ProductAnalysisResult to keep response_model consistent
+            return ProductAnalysisResult(product_name=product_name or "Sản phẩm", usps=[], pain_points=[], infor="Không tìm thấy dữ liệu", target_persona="Không tìm thấy dữ liệu")
     except HTTPException:
         raise
     except Exception as e:
