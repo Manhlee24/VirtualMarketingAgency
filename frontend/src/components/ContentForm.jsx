@@ -17,6 +17,9 @@ function ContentForm({
   loading,
   goBack,
   goToPoster,
+  onSaveContent,
+  savingContent,
+  savedContent,
 }) {
   return (
     <div className="mt-10 pt-8 border-t-2 border-gray-200">
@@ -114,6 +117,13 @@ function ContentForm({
             KẾT QUẢ SÁNG TẠO NỘI DUNG
           </h4>
 
+          {/* Meta chips */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800 font-semibold">USP: {selectedUsp}</span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-indigo-100 text-indigo-800 font-semibold">Tone: {selectedTone}</span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800 font-semibold">Format: {selectedFormat}</span>
+          </div>
+
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-4">
             <p className="text-sm text-gray-500 font-semibold mb-2">TIÊU ĐỀ GỢI Ý:</p>
             <h5 className="text-2xl font-bold text-gray-900 leading-snug">
@@ -123,17 +133,35 @@ function ContentForm({
 
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
             <p className="text-sm text-gray-500 font-semibold mb-2">NỘI DUNG CHI TIẾT:</p>
-            <div className="text-gray-800 leading-relaxed whitespace-pre-line">
+            <div className="prose max-w-none prose-p:my-2 prose-ul:my-2 prose-li:list-disc prose-li:ml-5 text-gray-800">
               {formatContent(generatedContent.content)}
+            </div>
+            <div className="mt-4 text-right">
+              <button
+                type="button"
+                onClick={() => navigator.clipboard?.writeText(generatedContent.content)}
+                className="inline-flex items-center px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold"
+              >
+                Sao chép nội dung
+              </button>
             </div>
           </div>
 
-          <button
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <button
             onClick={goToPoster}
-            className="mt-6 w-full flex items-center justify-center bg-orange-600 text-white font-bold py-3 rounded-lg text-lg hover:bg-orange-700 transition duration-300 shadow-lg shadow-orange-400/50"
-          >
-            ĐI TỚI GIAI ĐOẠN 3: TẠO POSTER
-          </button>
+            className="w-full flex items-center justify-center bg-orange-600 text-white font-bold py-3 rounded-lg text-lg hover:bg-orange-700 transition duration-300 shadow-lg shadow-orange-400/50"
+            >
+              ĐI TỚI GIAI ĐOẠN 3: TẠO POSTER
+            </button>
+            <button
+              onClick={onSaveContent}
+              disabled={savingContent || savedContent}
+              className={`w-full flex items-center justify-center ${savingContent ? 'bg-gray-400' : (savedContent ? 'bg-green-600' : 'bg-indigo-600 hover:bg-indigo-700')} text-white font-bold py-3 rounded-lg text-lg transition duration-300 shadow-lg`}
+            >
+              {savingContent ? 'ĐANG LƯU...' : (savedContent ? 'ĐÃ LƯU' : 'LƯU NỘI DUNG')}
+            </button>
+          </div>
         </div>
       )}
     </div>

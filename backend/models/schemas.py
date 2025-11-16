@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from datetime import datetime
+from typing import Any
 
 
 # ===== Shared Enums =====
@@ -91,6 +93,73 @@ class CompetitorAnalysisResult(BaseModel):
     marketing_strategy: MarketingStrategySection
     distribution_market: DistributionMarketSection
 
+# ===== Save request/response models =====
+class SaveStatus(BaseModel):
+    id: int
+    message: str = "saved"
+
+
+class SaveContentRequest(BaseModel):
+    product_name: str
+    target_persona: str
+    selected_usp: str
+    selected_tone: str
+    selected_format: str
+    infor: str
+    title: str
+    content: str
+
+
+class SaveImageRequest(BaseModel):
+    product_name: str
+    ad_copy: str
+    usp: str
+    infor: str
+    style_short: Optional[str] = None
+    image_url: str
+    prompt_used: Optional[str] = None
+    reference_url: Optional[str] = None
+
+
+class AnalysisRecordOut(BaseModel):
+    id: int
+    product_name: str
+    usps: List[str]
+    pain_points: List[str]
+    target_persona: str
+    infor: str
+    created_at: datetime
+
+    class Config:
+        json_encoders = {}
+
+
+class ContentRecordOut(BaseModel):
+    id: int
+    product_name: str
+    target_persona: str
+    selected_usp: str
+    selected_tone: str
+    selected_format: str
+    infor: str
+    title: str
+    content: str
+    created_at: datetime
+
+
+class ImageRecordOut(BaseModel):
+    id: int
+    product_name: str
+    ad_copy: str
+    usp: str
+    infor: str
+    style_short: Optional[str]
+    image_url: str
+    prompt_used: Optional[str]
+    reference_url: Optional[str]
+    created_at: datetime
+
+
 
 __all__ = [
     # enums
@@ -111,4 +180,11 @@ __all__ = [
     "CustomerFocusSection",
     "MarketingStrategySection",
     "DistributionMarketSection",
+    # save & history
+    "SaveStatus",
+    "SaveContentRequest",
+    "SaveImageRequest",
+    "AnalysisRecordOut",
+    "ContentRecordOut",
+    "ImageRecordOut",
 ]

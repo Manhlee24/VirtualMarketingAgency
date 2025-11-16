@@ -5,6 +5,10 @@ import ContentGenerationForm from "./components/ContentGenerationForm.jsx";
 import Header from "./components/Header.jsx";
 import Footer from "./components/Footer.jsx";
 import HomePage from "./pages/HomePage.jsx";
+import History from "./pages/History.jsx";
+import HistoryAnalyses from "./pages/HistoryAnalyses.jsx";
+import HistoryContents from "./pages/HistoryContents.jsx";
+import HistoryImages from "./pages/HistoryImages.jsx";
 import AuthForm from "./pages/AuthForm.jsx";
 import CompetitorAnalysisPage from "./pages/CompetitorAnalysisPage.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
@@ -46,6 +50,34 @@ function AppRoutes() {
                     />
                     {/* Route phân tích đối thủ - không cần authentication */}
                     <Route path="/competitor-analysis" element={<CompetitorAnalysisPage />} />
+                    <Route 
+                        path="/history"
+                        element={<Navigate to="/history/analyses" replace />}
+                    />
+                    <Route 
+                        path="/history/analyses"
+                        element={
+                            <ProtectedRoute>
+                                <HistoryAnalyses />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route 
+                        path="/history/contents"
+                        element={
+                            <ProtectedRoute>
+                                <HistoryContents />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route 
+                        path="/history/images"
+                        element={
+                            <ProtectedRoute>
+                                <HistoryImages />
+                            </ProtectedRoute>
+                        }
+                    />
                 </Routes>
             </main>
             <Footer />

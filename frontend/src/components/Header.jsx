@@ -30,6 +30,14 @@ function Header() {
                         >
                             Tạo Content
                         </Link>
+                        {isAuthenticated && (
+                            <Link 
+                                to="/history/analyses" 
+                                className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
+                            >
+                                Lịch sử
+                            </Link>
+                        )}
                         
                         <Link 
                             to="/competitor-analysis" 

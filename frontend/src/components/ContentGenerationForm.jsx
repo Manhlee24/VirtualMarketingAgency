@@ -1,14 +1,16 @@
 // src/components/ContentGenerationForm.jsx
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import axios from "axios";
 import { ToneOptions, FormatOptions } from "../utils/constants.jsx";
 
 // Import các component con
-import Phase1Input from "./Phase1Input";
-import Phase1Result from "./Phase1Result";
+import AnalysisInput from "./AnalysisInput";
+import AnalysisResult from "./AnalysisResult";
 import ContentForm from "./ContentForm";
 import PosterGeneration from "./PosterGeneration";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { useLocation } from "react-router-dom";
 
 // --- HELPER FUNCTIONS (Có thể giữ lại hoặc chuyển sang utils) ---
 const formatContent = (content) => {
@@ -51,11 +53,72 @@ function ContentGenerationForm() {
   const [referenceImageFile, setReferenceImageFile] = useState(null);
   const [referenceImagePreview, setReferenceImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+	const [error, setError] = useState(null);
+	const [successMessage, setSuccessMessage] = useState(null);
+	const [savingAnalysis, setSavingAnalysis] = useState(false);
+	const [savingContent, setSavingContent] = useState(false);
+		const [savingImage, setSavingImage] = useState(false);
+		const [savedAnalysis, setSavedAnalysis] = useState(false);
+		const [savedContent, setSavedContent] = useState(false);
+		const [savedImage, setSavedImage] = useState(false);
 
   const BASE_URL = "http://127.0.0.1:8000/api/v1";
+	const { token } = useAuth();
+	const location = useLocation();
 
   // --- LOGIC XỬ LÝ API CALLS ---
+	// Resume flows from History pages
+	useEffect(() => {
+		const params = new URLSearchParams(location.search || "");
+		const resume = params.get("resume");
+		if (!resume) return;
+		try {
+			if (resume === "analysis") {
+				const raw = localStorage.getItem("resumeAnalysis");
+				if (!raw) return;
+				const r = JSON.parse(raw);
+				const preAnalysis = {
+					product_name: r.product_name,
+					usps: Array.isArray(r.usps) ? r.usps : [],
+					pain_points: Array.isArray(r.pain_points) ? r.pain_points : [],
+					target_persona: r.target_persona || "",
+					infor: r.infor || "",
+				};
+				setAnalysisData(preAnalysis);
+				if (preAnalysis.usps.length > 0) setSelectedUsp(preAnalysis.usps[0]);
+				setGeneratedContent(null);
+				setGeneratedPoster(null);
+				setAdCopy("");
+				setStyleShort("");
+				setCurrentStep(2);
+			} else if (resume === "content") {
+				const raw = localStorage.getItem("resumeContent");
+				if (!raw) return;
+				const r = JSON.parse(raw);
+				const preAnalysis = {
+					product_name: r.product_name,
+					usps: r.selected_usp ? [r.selected_usp] : [],
+					pain_points: [],
+					target_persona: r.target_persona || "",
+					infor: r.infor || "",
+				};
+				setAnalysisData(preAnalysis);
+				if (preAnalysis.usps.length > 0) setSelectedUsp(preAnalysis.usps[0]);
+				const preContent = { title: r.title, content: r.content };
+				setGeneratedContent(preContent);
+				setAdCopy(r.content || "");
+				setStyleShort("");
+				// Jump to poster creation directly
+				setCurrentStep(4);
+			}
+		} catch (e) {
+			console.error("Resume failed:", e);
+		} finally {
+			try { localStorage.removeItem("resumeAnalysis"); } catch {}
+			try { localStorage.removeItem("resumeContent"); } catch {}
+		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 		const handleAnalysis = async (e) => {
     e.preventDefault();
@@ -102,6 +165,81 @@ function ContentGenerationForm() {
       setLoading(false);
     }
   };
+
+	// Save handlers
+	const saveAnalysis = async () => {
+		if (!analysisData || !token) return;
+		setSavingAnalysis(true);
+			try {
+			await axios.post(`${BASE_URL}/save_analysis`, analysisData, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+				setSavedAnalysis(true);
+				setSuccessMessage("Đã lưu kết quả phân tích.");
+				setTimeout(() => setSuccessMessage(null), 2500);
+		} catch (err) {
+			console.error("Save analysis failed:", err);
+			setError("Lưu kết quả phân tích thất bại.");
+			} finally {
+			setSavingAnalysis(false);
+		}
+	};
+
+	const saveContent = async () => {
+		if (!generatedContent || !analysisData || !token) return;
+		setSavingContent(true);
+			try {
+			const payload = {
+				product_name: analysisData.product_name,
+				target_persona: analysisData.target_persona,
+				selected_usp: selectedUsp,
+				selected_tone: selectedTone,
+				selected_format: selectedFormat,
+				infor: analysisData.infor,
+				title: generatedContent.title,
+				content: generatedContent.content,
+			};
+			await axios.post(`${BASE_URL}/save_content`, payload, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+				setSavedContent(true);
+				setSuccessMessage("Đã lưu nội dung.");
+				setTimeout(() => setSuccessMessage(null), 2500);
+		} catch (err) {
+			console.error("Save content failed:", err);
+			setError("Lưu nội dung thất bại.");
+		} finally {
+			setSavingContent(false);
+		}
+	};
+
+	const saveImage = async () => {
+		if (!generatedPoster || !analysisData || !token) return;
+		setSavingImage(true);
+			try {
+			const payload = {
+				product_name: analysisData.product_name,
+				ad_copy: adCopy,
+				usp: selectedUsp,
+				infor: analysisData.infor,
+				style_short: styleShort,
+				image_url: generatedPoster.image_url,
+				prompt_used: generatedPoster.prompt_used,
+				reference_url: generatedPoster.reference_url || null,
+			};
+			await axios.post(`${BASE_URL}/save_image`, payload, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+				setSavedImage(true);
+				setSuccessMessage("Đã lưu poster.");
+				setTimeout(() => setSuccessMessage(null), 2500);
+		} catch (err) {
+			console.error("Save image failed:", err);
+			setError("Lưu poster thất bại.");
+		} finally {
+			setSavingImage(false);
+		}
+	};
 
   const handleContentGeneration = async (e) => {
     e.preventDefault();
@@ -179,7 +317,7 @@ function ContentGenerationForm() {
   const renderContent = () => {
     if (currentStep === 1) {
       return (
-				<Phase1Input 
+				<AnalysisInput 
 					productName={productName}
 					setProductName={setProductName}
 					analysisMode={analysisMode}
@@ -194,11 +332,11 @@ function ContentGenerationForm() {
     
     if (currentStep === 2 && analysisData) {
       return (
-				<Phase1Result
+				<AnalysisResult
 					analysisData={analysisData}
-					goToStep3={() => setCurrentStep(3)}
+					goToContent={() => setCurrentStep(3)}
 					goToPoster={() => setCurrentStep(4)}
-					goToStep1={() => {
+					goBackToInput={() => {
 						// Reset all downstream states when returning to step 1
 						setGeneratedContent(null);
 						setAdCopy("");
@@ -208,6 +346,9 @@ function ContentGenerationForm() {
 						setReferenceImagePreview(null);
 						setCurrentStep(1);
 					}}
+								onSaveAnalysis={saveAnalysis}
+								saving={savingAnalysis}
+								saved={savedAnalysis}
 				/>
       );
     } 
@@ -228,6 +369,9 @@ function ContentGenerationForm() {
 					loading={loading}
 					goBack={() => { setCurrentStep(2); }}
 					goToPoster={() => setCurrentStep(4)}
+							onSaveContent={saveContent}
+							savingContent={savingContent}
+							savedContent={savedContent}
 				/>
 			);
 		}
@@ -248,6 +392,9 @@ function ContentGenerationForm() {
 					isGeneratingImage={isGeneratingImage}
 					imageError={imageError}
 					goBack={() => setCurrentStep(2)}
+							onSaveImage={saveImage}
+							savingImage={savingImage}
+							savedImage={savedImage}
 				/>
 			);
 		}
@@ -266,7 +413,13 @@ function ContentGenerationForm() {
         </h2>
       </header>
 
-      {renderContent()}
+			{successMessage && (
+				<div className="mb-6 p-4 bg-green-50 text-green-800 rounded-lg border border-green-300 font-medium">
+					{successMessage}
+				</div>
+			)}
+
+			{renderContent()}
 
       {error && (
         <div className="mt-8 p-4 bg-red-50 text-red-800 rounded-lg border border-red-300 font-medium">

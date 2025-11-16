@@ -2,7 +2,7 @@
 
 import React from "react";
 
-function Phase1Result({ analysisData, goToStep3, goToStep1, goToPoster }) {
+function Phase1Result({ analysisData, goToStep3, goToStep1, goToPoster, onSaveAnalysis, saving }) {
   const hasData =
     analysisData.usps.length > 0 || analysisData.target_persona.length > 0;
 
@@ -70,7 +70,7 @@ function Phase1Result({ analysisData, goToStep3, goToStep1, goToPoster }) {
             </div>
           </div>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
 						<button
 							onClick={goToStep3}
 							className="w-full flex items-center justify-center bg-green-600 text-white font-extrabold py-3 rounded-lg text-xl hover:bg-green-700 transition duration-300 shadow-lg shadow-green-400/50"
@@ -83,6 +83,13 @@ function Phase1Result({ analysisData, goToStep3, goToStep1, goToPoster }) {
 						>
 							GIAI ĐOẠN 3: TẠO POSTER
 						</button>
+									<button
+										onClick={onSaveAnalysis}
+										disabled={saving}
+										className={`w-full flex items-center justify-center ${saving ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-extrabold py-3 rounded-lg text-xl transition duration-300 shadow-lg shadow-indigo-400/50`}
+									>
+										{saving ? 'ĐANG LƯU...' : 'LƯU KẾT QUẢ PHÂN TÍCH'}
+									</button>
 					</div>
         </>
       ) : (
