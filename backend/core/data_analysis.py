@@ -1,7 +1,10 @@
 import json
+import logging
 from google.genai import types
 from models.schemas import ProductAnalysisResult
 from core.ai_clients import get_gemini_client, GEMINI_API_KEY
+
+logger = logging.getLogger(__name__)
 
 def analyze_product_data(product_name: str) -> ProductAnalysisResult | None:
     """
@@ -32,7 +35,8 @@ Use Vietnamese language for all outputs.
             return None
         response = None
         cfg = types.GenerateContentConfig(tools=[{"google_search": {}}]) if hasattr(types, "GenerateContentConfig") else None
-        print("cfg: " + cfg)
+        # don't concatenate object to string; use comma or f-string to safely represent cfg
+        print("cfg:", cfg)
         if hasattr(client, "models") and hasattr(client.models, "generate_content"):
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
@@ -53,16 +57,56 @@ Use Vietnamese language for all outputs.
             json_text = response.text.strip().replace("```json", "").replace("```", "").strip()
             data = json.loads(json_text)
         except json.JSONDecodeError as e:
-            print(f"Lỗi phân tích JSON từ Gemini: {e}")
-            print(f"Text gốc gây lỗi: {response.text[:200]}...")
+
+            logger.warning("Lỗi phân tích JSON từ Gemini: %s", e)
+            logger.debug("Text gốc gây lỗi: %s", getattr(response, "text", "")[:1000])
+            # Có thể trả về kết quả rỗng nếu không thể đọc được
             return None
-        
+
+        # Normalize fields to expected types (ProductAnalysisResult expects strings for some fields)
+        def ensure_list_of_str(v):
+            if v is None:
+                return []
+            if isinstance(v, list):
+                return [str(x) for x in v]
+            if isinstance(v, str):
+                # try splitting by newline or comma if it looks like a single string list
+                if "\n" in v:
+                    return [s.strip() for s in v.splitlines() if s.strip()]
+                if "," in v:
+                    return [s.strip() for s in v.split(",") if s.strip()]
+                return [v]
+            # fallback: stringify
+            return [str(v)]
+
+        def ensure_str(v):
+            if v is None:
+                return "Chưa xác định"
+            if isinstance(v, str):
+                return v
+            if isinstance(v, list):
+                return ", ".join(str(x) for x in v)
+            if isinstance(v, dict):
+                # Prefer a concise representation
+                try:
+                    return json.dumps(v, ensure_ascii=False)
+                except Exception:
+                    return str(v)
+            return str(v)
+
+        logger.debug("Parsed Gemini data: %s", data)
+
+        usps = ensure_list_of_str(data.get('usps'))
+        pain_points = ensure_list_of_str(data.get('pain_points'))
+        target_persona = ensure_str(data.get('target_persona'))
+        infor_field = ensure_str(data.get('infor'))
+
         return ProductAnalysisResult(
             product_name=product_name,
-            usps=data.get('usps', []),
-            pain_points=data.get('pain_points', []),
-            target_persona=data.get('target_persona', 'Chưa xác định'),
-            infor=data.get('infor', 'Chưa xác định')
+            usps=usps,
+            pain_points=pain_points,
+            target_persona=target_persona,
+            infor=infor_field,
         )
         
     except Exception as e:
