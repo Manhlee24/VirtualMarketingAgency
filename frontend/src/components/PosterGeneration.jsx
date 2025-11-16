@@ -16,6 +16,9 @@ function PosterGeneration({
   isGeneratingImage,
   imageError,
   goBack,
+  onSaveImage,
+  savingImage,
+  savedImage,
 }) {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0] || null;
@@ -116,14 +119,30 @@ function PosterGeneration({
                 Prompt đã dùng:{" "}
                 <span className="font-mono text-xs">{generatedPoster.prompt_used}</span>
               </p>
-              <a
-                href={generatedPoster.image_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 inline-block bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 transition font-bold"
-              >
-                Tải Poster (MOCK)
-              </a>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <a
+                  href={generatedPoster.image_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-center bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700 transition font-bold"
+                >
+                  Xem Poster
+                </a>
+                <a
+                  href={generatedPoster.image_url}
+                  download
+                  className="inline-block text-center bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition font-bold"
+                >
+                  Tải xuống
+                </a>
+                <button
+                  onClick={onSaveImage}
+                  disabled={savingImage || savedImage}
+                  className={`inline-block ${savingImage ? 'bg-gray-400' : (savedImage ? 'bg-green-600' : 'bg-indigo-600 hover:bg-indigo-700')} text-white py-2 px-4 rounded-lg transition font-bold`}
+                >
+                  {savingImage ? 'ĐANG LƯU...' : (savedImage ? 'ĐÃ LƯU' : 'LƯU POSTER')}
+                </button>
+              </div>
             </div>
           )}
         </div>
