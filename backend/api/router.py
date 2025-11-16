@@ -8,12 +8,15 @@ from core.data_analysis import analyze_product_data
 from core.content_generation import generate_marketing_content
 from core.document_analysis import generate_product_analysis_from_document
 from core.image_generation import generate_marketing_poster
+from core.competitor_analysis import analyze_competitor_market
 from models.schemas import (
     ProductAnalysisRequest,
     ProductAnalysisResult,
     ContentGenerationRequest,
     GeneratedContentResponse,
     ImageGenerationResponse,
+    CompetitorAnalysisRequest,
+    CompetitorAnalysisResult,
 )
 from pathlib import Path
 import time
@@ -72,6 +75,38 @@ async def analyze_document(
     except Exception as e:
         logger.exception("Error in analyze_document route: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# PHÂN TÍCH ĐỐI THỦ CẠNH TRANH
+
+@router.post("/analyze_competitor", response_model=CompetitorAnalysisResult)
+def analyze_competitor(request: CompetitorAnalysisRequest):
+    """
+    Phân tích chiến lược thị trường của đối thủ cạnh tranh.
+    Sử dụng Google Search để thu thập thông tin về sản phẩm, khách hàng, 
+    marketing và phân phối của đối thủ.
+    """
+    logger.info(f"Bắt đầu phân tích đối thủ cạnh tranh: {request.competitor_name}")
+    
+    try:
+        result = analyze_competitor_market(request.competitor_name)
+        
+        if result:
+            # Chuyển đổi dict thành CompetitorAnalysisResult
+            return CompetitorAnalysisResult(**result)
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail="Không thể phân tích đối thủ cạnh tranh. Vui lòng thử lại."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Lỗi khi phân tích đối thủ cạnh tranh: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Lỗi Server: Không thể phân tích đối thủ cạnh tranh. Chi tiết: {str(e)}"
+        )
 
 
 # ===============================================

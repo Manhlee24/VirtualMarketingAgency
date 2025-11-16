@@ -6,6 +6,7 @@ import Header from "./components/Header.jsx";
 import Footer from "./components/Footer.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import AuthForm from "./pages/AuthForm.jsx";
+import CompetitorAnalysisPage from "./pages/CompetitorAnalysisPage.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
 
 // Component bảo vệ route
@@ -43,6 +44,8 @@ function AppRoutes() {
                             </ProtectedRoute>
                         } 
                     />
+                    {/* Route phân tích đối thủ - không cần authentication */}
+                    <Route path="/competitor-analysis" element={<CompetitorAnalysisPage />} />
                 </Routes>
             </main>
             <Footer />

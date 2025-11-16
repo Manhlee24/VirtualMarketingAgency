@@ -31,6 +31,14 @@ function Header() {
                             Tạo Content
                         </Link>
                         
+                        <Link 
+                            to="/competitor-analysis" 
+                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150 flex items-center gap-1"
+                        >
+                            Phân tích Đối thủ
+                            <span className="px-1.5 py-0.5 bg-yellow-400 text-indigo-900 text-xs font-bold rounded">NEW</span>
+                        </Link>
+                        
                         {isAuthenticated ? (
                             <div className="flex items-center space-x-3">
                                 <span className="text-indigo-200 text-sm font-semibold">
