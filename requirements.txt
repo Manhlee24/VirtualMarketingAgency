@@ -1,0 +1,16 @@
+fastapi[all]
+uvicorn
+pydantic
+python-dotenv
+google-genai
+openai
+python-docx 
+pypdf
+cloudinary
+SQLAlchemy>=2.0.0
+pymysql
+# Use passlib with bcrypt support and ensure compatibility with bcrypt module
+passlib[bcrypt]>=1.7.4
+# Pin bcrypt to a version compatible with passlib's backend detection
+bcrypt<4.0
+python-jose[cryptography]
