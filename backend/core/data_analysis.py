@@ -1,10 +1,18 @@
 import json
 import logging
+import time
+import random
 from google.genai import types
 from models.schemas import ProductAnalysisResult
 from core.ai_clients import get_gemini_client, GEMINI_API_KEY
 
 logger = logging.getLogger(__name__)
+# Reduce noisy logs from Google SDK if desired
+try:
+    logging.getLogger("google").setLevel(logging.WARNING)
+    logging.getLogger("google.genai").setLevel(logging.WARNING)
+except Exception:
+    pass
 
 def analyze_product_data(product_name: str) -> ProductAnalysisResult | None:
     """
@@ -33,24 +41,57 @@ Use Vietnamese language for all outputs.
         client = get_gemini_client()
         if not client or not GEMINI_API_KEY:
             return None
-        response = None
+
         cfg = types.GenerateContentConfig(tools=[{"google_search": {}}]) if hasattr(types, "GenerateContentConfig") else None
-        # don't concatenate object to string; use comma or f-string to safely represent cfg
-        print("cfg:", cfg)
-        if hasattr(client, "models") and hasattr(client.models, "generate_content"):
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-                config=cfg
-            )
-            print("response of gemini-2.5-flash")
-        elif hasattr(client, "generate_content"):
-            # Fallback without tools config
-            response = client.generate_content(prompt)
-        
-        # 1. KIỂM TRA NỘI DUNG PHẢN HỒI (KHẮC PHỤC 'NoneType' object has no attribute 'strip')
+        logger.debug("Gemini config prepared: %s", cfg)
+
+        def do_call(model_name: str, use_cfg: bool):
+            if hasattr(client, "models") and hasattr(client.models, "generate_content"):
+                return client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=(cfg if use_cfg else None)
+                )
+            elif hasattr(client, "generate_content"):
+                # Fallback without tools config
+                return client.generate_content(prompt)
+            return None
+
+        # Retry with exponential backoff and final fallback model/config
+        response = None
+        last_err = None
+        models_try = [
+            ("gemini-2.5-flash", True),
+            ("gemini-2.5-flash", True),
+            ("gemini-2.5-flash", False),
+            ("gemini-1.5-flash", False),
+        ]
+        for attempt, (model_name, use_cfg) in enumerate(models_try, start=1):
+            try:
+                response = do_call(model_name, use_cfg)
+                if response and getattr(response, "text", None):
+                    break
+                else:
+                    raise RuntimeError("Empty response text from Gemini")
+            except Exception as e:
+                last_err = e
+                msg = str(e)
+                # Backoff only for transient overloads/timeouts
+                if attempt < len(models_try) and any(t in msg for t in ["503", "UNAVAILABLE", "overloaded", "timeout", "temporarily"]):
+                    delay = min(2 ** attempt + random.uniform(0, 0.5), 8)
+                    logging.info("Gemini call failed (attempt %d/%d, model=%s, cfg=%s). Retrying in %.1fs...", attempt, len(models_try), model_name, use_cfg, delay)
+                    time.sleep(delay)
+                    continue
+                else:
+                    logging.warning("Gemini call failed (attempt %d/%d): %s", attempt, len(models_try), msg)
+                    if attempt < len(models_try):
+                        continue
+                    break
+
         if not response or not getattr(response, "text", None):
             print(f"Gemini API không trả về nội dung văn bản cho sản phẩm: {product_name}")
+            if last_err:
+                print(f"Lỗi API Gemini hoặc lỗi kết nối chung: {last_err}")
             return None
             
         try:

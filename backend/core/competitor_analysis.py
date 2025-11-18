@@ -91,33 +91,63 @@ Cấu trúc JSON phải là:
             logger.error("Không thể gọi generate_content từ Gemini client")
             return None
         
-        # Xử lý response
-        if response and hasattr(response, "text"):
-            raw_text = response.text.strip()
-            logger.info(f"Phản hồi từ Gemini: {raw_text[:200]}...")
-            
-            # Làm sạch text để lấy JSON
-            # Loại bỏ markdown code blocks nếu có
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:]
-            if raw_text.startswith("```"):
-                raw_text = raw_text[3:]
-            if raw_text.endswith("```"):
-                raw_text = raw_text[:-3]
-            
-            raw_text = raw_text.strip()
-            
-            # Parse JSON
-            try:
-                parsed_data = json.loads(raw_text)
-                logger.info("Phân tích đối thủ thành công")
-                return parsed_data
-            except json.JSONDecodeError as je:
-                logger.error(f"Lỗi parse JSON: {je}")
-                logger.error(f"Raw text: {raw_text}")
+        # Xử lý response an toàn (có thể text bị None)
+        raw_text = getattr(response, "text", None)
+        if not raw_text:
+            logger.warning("Gemini trả về response không có text cho đối thủ '%s'", competitor_name)
+            return None
+
+        raw_text = raw_text.strip()
+        logger.info("Phản hồi từ Gemini: %s...", raw_text[:200])
+
+        # Làm sạch markdown code fences nếu có
+        cleaned = raw_text.replace("```json", "").replace("```", "").strip()
+
+        # Thử parse trực tiếp
+        try:
+            parsed_data = json.loads(cleaned)
+            logger.info("Phân tích đối thủ thành công")
+            return parsed_data
+        except json.JSONDecodeError:
+            # Thử tìm đoạn JSON cân bằng dấu ngoặc
+            def _balanced_json_fragment(text: str):
+                start = text.find('{')
+                if start == -1:
+                    return None
+                depth = 0
+                in_string = False
+                escape = False
+                for i in range(start, len(text)):
+                    ch = text[i]
+                    if in_string:
+                        if escape:
+                            escape = False
+                        elif ch == '\\':
+                            escape = True
+                        elif ch == '"':
+                            in_string = False
+                    else:
+                        if ch == '"':
+                            in_string = True
+                        elif ch == '{':
+                            depth += 1
+                        elif ch == '}':
+                            depth -= 1
+                            if depth == 0:
+                                return text[start:i+1]
                 return None
-        else:
-            logger.error("Không nhận được response hợp lệ từ Gemini")
+
+            frag = _balanced_json_fragment(cleaned)
+            if frag:
+                try:
+                    parsed_data = json.loads(frag)
+                    logger.info("Phân tích đối thủ thành công (từ JSON fragment)")
+                    return parsed_data
+                except Exception as je2:
+                    logger.error("Lỗi parse JSON fragment: %s", je2)
+                    logger.debug("Fragment: %s", frag[:500])
+            logger.error("Không thể parse JSON từ phản hồi Gemini")
+            logger.debug("Raw text: %s", raw_text[:2000])
             return None
             
     except Exception as e:

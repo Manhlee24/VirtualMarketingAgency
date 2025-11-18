@@ -40,8 +40,8 @@ function ContentGenerationForm() {
 	const [productName, setProductName] = useState("");
 	const [analysisMode, setAnalysisMode] = useState("name"); // 'name' | 'document'
 	const [documentFile, setDocumentFile] = useState(null);
-  const [analysisData, setAnalysisData] = useState(null);
-  const [selectedUsp, setSelectedUsp] = useState("");
+	const [analysisData, setAnalysisData] = useState(null);
+	const [selectedUsps, setSelectedUsps] = useState([]);
   const [selectedTone, setSelectedTone] = useState(ToneOptions[0].value);
   const [selectedFormat, setSelectedFormat] = useState(FormatOptions[0].value);
   const [generatedContent, setGeneratedContent] = useState(null);
@@ -62,11 +62,9 @@ function ContentGenerationForm() {
 		const [savedImage, setSavedImage] = useState(false);
 
 		// --- NEW OPTIONAL INPUT STATES ---
-		const [industry, setIndustry] = useState("");
 		const [seoEnabled, setSeoEnabled] = useState(false);
 		const [language, setLanguage] = useState("vi"); // 'vi' | 'en' | others
 		const [category, setCategory] = useState("");
-		const [topic, setTopic] = useState("");
 		const [desiredLength, setDesiredLength] = useState(""); // keep as string then parseInt
 		const [customTitle, setCustomTitle] = useState("");
 		const [keyPoints, setKeyPoints] = useState("");
@@ -83,19 +81,27 @@ function ContentGenerationForm() {
 		const resume = params.get("resume");
 		if (!resume) return;
 		try {
+			const splitMulti = (val) => {
+				if (!val) return [];
+				if (Array.isArray(val)) return val.filter(Boolean);
+				return String(val)
+					.split(/[,;|\n]/)
+					.map((p) => p.trim())
+					.filter((p) => p.length > 0);
+			};
 			if (resume === "analysis") {
 				const raw = localStorage.getItem("resumeAnalysis");
 				if (!raw) return;
 				const r = JSON.parse(raw);
 				const preAnalysis = {
 					product_name: r.product_name,
-					usps: Array.isArray(r.usps) ? r.usps : [],
+					usps: Array.isArray(r.usps) ? r.usps : splitMulti(r.usps),
 					pain_points: Array.isArray(r.pain_points) ? r.pain_points : [],
 					target_persona: r.target_persona || "",
 					infor: r.infor || "",
 				};
 				setAnalysisData(preAnalysis);
-				if (preAnalysis.usps.length > 0) setSelectedUsp(preAnalysis.usps[0]);
+				if (preAnalysis.usps.length > 0) setSelectedUsps([preAnalysis.usps[0]]);
 				setGeneratedContent(null);
 				setGeneratedPoster(null);
 				setStyleShort("");
@@ -106,17 +112,16 @@ function ContentGenerationForm() {
 				const r = JSON.parse(raw);
 				const preAnalysis = {
 					product_name: r.product_name,
-					usps: r.selected_usp ? [r.selected_usp] : [],
+					usps: splitMulti(r.selected_usp),
 					pain_points: [],
 					target_persona: r.target_persona || "",
 					infor: r.infor || "",
 				};
 				setAnalysisData(preAnalysis);
-				if (preAnalysis.usps.length > 0) setSelectedUsp(preAnalysis.usps[0]);
+				if (preAnalysis.usps.length > 0) setSelectedUsps(preAnalysis.usps.slice(0, 3));
 				const preContent = { title: r.title, content: r.content };
 				setGeneratedContent(preContent);
 				setStyleShort("");
-				// Jump to poster creation directly
 				setCurrentStep(4);
 			}
 		} catch (e) {
@@ -135,9 +140,9 @@ function ContentGenerationForm() {
 			setError("Vui lòng chọn file PDF hoặc DOCX để phân tích tài liệu.");
 			return;
 		}
-    setLoading(true);
-    setAnalysisData(null);
-    setError(null);
+	    setLoading(true);
+	    setAnalysisData(null);
+	    setError(null);
 
 		try {
 			let data;
@@ -146,16 +151,12 @@ function ContentGenerationForm() {
 				data = response.data;
 					} else {
 						const formData = new FormData();
-						// In document mode, do NOT send product_name to avoid leaking previous input;
-						// backend will infer the product name from the document content.
+						// Backend expects field name 'file'
 						formData.append("file", documentFile);
-				const response = await axios.post(`${BASE_URL}/analyze_document`, formData, {
-					headers: {
-						"Content-Type": "multipart/form-data",
-						...(token ? { Authorization: `Bearer ${token}` } : {}),
-					},
-				});
-				data = response.data;
+						const headers = { "Content-Type": "multipart/form-data" };
+						if (token) headers["Authorization"] = `Bearer ${token}`;
+						const response = await axios.post(`${BASE_URL}/analyze_document`, formData, { headers });
+						data = response.data;
 					}
 					// Reset content/media states when a new analysis completes
 					setGeneratedContent(null);
@@ -164,6 +165,8 @@ function ContentGenerationForm() {
 					setReferenceImageFile(null);
 					setReferenceImagePreview(null);
 					setAnalysisData(data);
+					// Ensure any previous error banner is cleared on success
+					setError(null);
 			setCurrentStep(2);
 			if (data.usps && data.usps.length > 0) {
 				setSelectedUsp(data.usps[0]);
@@ -240,7 +243,7 @@ function ContentGenerationForm() {
 
   const handleContentGeneration = async (e) => {
     e.preventDefault();
-    if (!selectedUsp || !analysisData) { setError("Thiếu dữ liệu để tạo nội dung."); return; }
+		if (!analysisData || !selectedUsps || selectedUsps.length === 0) { setError("Thiếu dữ liệu: vui lòng chọn ít nhất 1 USP."); return; }
 
     setLoading(true);
     setGeneratedContent(null);
@@ -249,19 +252,19 @@ function ContentGenerationForm() {
     setImageError(null);
 
     try {
-      const requestData = {
+			const requestData = {
         product_name: analysisData.product_name,
         target_persona: analysisData.target_persona,
-        selected_usp: selectedUsp,
+				selected_usps: selectedUsps,
+				// backward compatibility for older backend expectations or logs
+				selected_usp: selectedUsps[0] || undefined,
         selected_tone: selectedTone,
         selected_format: selectedFormat,
         infor: analysisData.infor,
 				// optional advanced fields
-				industry: industry || undefined,
 				seo_enabled: !!seoEnabled,
 				language: language || undefined,
 				category: category || undefined,
-				topic: topic || undefined,
 				desired_length: desiredLength ? parseInt(desiredLength, 10) : undefined,
 				custom_title: customTitle || undefined,
 				key_points: keyPoints || undefined,
@@ -357,24 +360,20 @@ function ContentGenerationForm() {
     
 		if (currentStep === 3 && analysisData) {
 			return (
-				<ContentForm
+								<ContentForm
 					analysisData={analysisData}
-					selectedUsp={selectedUsp}
-					setSelectedUsp={setSelectedUsp}
+									selectedUsps={selectedUsps}
+									setSelectedUsps={setSelectedUsps}
 					selectedFormat={selectedFormat}
 					setSelectedFormat={setSelectedFormat}
 					selectedTone={selectedTone}
 					setSelectedTone={setSelectedTone}
-					industry={industry}
-					setIndustry={setIndustry}
 					seoEnabled={seoEnabled}
 					setSeoEnabled={setSeoEnabled}
 					language={language}
 					setLanguage={setLanguage}
 					category={category}
 					setCategory={setCategory}
-					topic={topic}
-					setTopic={setTopic}
 					desiredLength={desiredLength}
 					setDesiredLength={setDesiredLength}
 					customTitle={customTitle}
@@ -390,13 +389,14 @@ function ContentGenerationForm() {
 					goBack={() => { setCurrentStep(2); }}
 					goToPoster={() => setCurrentStep(4)}
 							onSaveContent={() => saveContent({
-								...analysisData,
-								selected_usp: selectedUsp,
-								selected_format: selectedFormat,
-								selected_tone: selectedTone,
-								title: generatedContent.title,
-								content: generatedContent.content,
-							})}
+										...analysisData,
+										// Persist as string for history compatibility
+										selected_usp: Array.isArray(selectedUsps) ? selectedUsps.join(", ") : String(selectedUsps || ""),
+										selected_format: selectedFormat,
+										selected_tone: selectedTone,
+										title: generatedContent.title,
+										content: generatedContent.content,
+									})}
 							savingContent={savingContent}
 							savedContent={savedContent}
 				/>
