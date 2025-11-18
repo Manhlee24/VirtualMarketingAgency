@@ -56,7 +56,9 @@ class CopyIntensity(str, Enum):
 class ContentGenerationRequest(BaseModel):
     product_name: str = Field(..., description="Tên sản phẩm gốc.")
     target_persona: str = Field(..., description="Chân dung khách hàng mục tiêu.")
-    selected_usp: str = Field(..., description="USP đã chọn để tập trung.")
+    # Support selecting multiple USPs; keep backward-compat single string
+    selected_usps: Optional[List[str]] = Field(None, description="Danh sách các USP đã chọn để tập trung.")
+    selected_usp: Optional[str] = Field(None, description="(Tương thích) Một USP duy nhất nếu client cũ gửi.")
     selected_tone: Tone = Field(..., description="Giọng điệu nội dung đã chọn.")
     selected_format: Format = Field(..., description="Định dạng nội dung đã chọn.")
     infor: str = Field(..., description="Các thông số sản phẩm nổi bật.")
@@ -65,11 +67,9 @@ class ContentGenerationRequest(BaseModel):
     cta_intent: Optional[CTAIntent] = Field(None, description="(Optional) CTA intent: sales, lead, engagement, app_install, awareness.")
     copy_intensity: Optional[CopyIntensity] = Field(None, description="(Optional) Copy intensity: soft, neutral, hard. If omitted the system auto-selects.")
     # Additional optional inputs from user (enhanced controls)
-    industry: Optional[str] = Field(None, description="(Optional) Lĩnh vực/ngành hàng.")
     seo_enabled: Optional[bool] = Field(False, description="(Optional) Bật chế độ SEO: ưu tiên chèn từ khoá và cấu trúc phù hợp SEO.")
     language: Optional[str] = Field("vi", description="(Optional) Ngôn ngữ đầu ra, ví dụ: 'vi', 'en'. Mặc định 'vi'.")
     category: Optional[str] = Field(None, description="(Optional) Thể loại nội dung, ví dụ: Quảng cáo, Giới thiệu, Hướng dẫn.")
-    topic: Optional[str] = Field(None, description="(Optional) Chủ đề bạn muốn viết.")
     desired_length: Optional[int] = Field(None, description="(Optional) Độ dài mong muốn (số từ).")
     custom_title: Optional[str] = Field(None, description="(Optional) Tiêu đề gợi ý/tự đặt.")
     key_points: Optional[str] = Field(None, description="(Optional) Mô tả các ý chính / yêu cầu (có thể xuống dòng).")
