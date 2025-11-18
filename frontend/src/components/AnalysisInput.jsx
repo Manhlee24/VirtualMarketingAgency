@@ -1,7 +1,7 @@
 // src/components/AnalysisInput.jsx
 
 import React, { useRef } from "react";
-
+import { Target } from 'lucide-react';
 function AnalysisInput({ productName, setProductName, analysisMode, setAnalysisMode, documentFile, setDocumentFile, handleAnalysis, loading }) {
   const fileInputRef = useRef(null);
   const prettySize = (bytes) => {
@@ -12,8 +12,17 @@ function AnalysisInput({ productName, setProductName, analysisMode, setAnalysisM
   };
 
   return (
+    
     <div className="lg:col-span-2 p-6 bg-indigo-50 rounded-xl border-2 border-indigo-200 shadow-lg">
-      <h3 className="text-3xl font-extrabold text-gray-900 mb-6">Phân tích sản phẩm</h3>
+      	<div className="text-center mb-8">
+				<div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full mb-4 shadow-lg">
+					<Target className="w-10 h-10 text-white" />
+				</div>
+				<h1 className="text-4xl font-extrabold text-gray-900 mb-2">Phân Tích Sản Phẩm</h1>
+				<p className="text-lg text-gray-600 max-w-3xl mx-auto">
+					Nhập tên sản phẩm hoặc tải lên tài liệu để AI thu thập dữ liệu công khai và phân tích thị trường chi tiết.
+				</p>
+			</div>
       <form onSubmit={handleAnalysis}>
         {/* Chọn chế độ phân tích */}
         <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:space-x-6">

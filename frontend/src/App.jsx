@@ -40,7 +40,7 @@ function AppRoutes() {
                     <Route path="/" element={<HomePage />} />
                     <Route path="/login" element={<AuthForm type="login" />} />
                     <Route path="/register" element={<AuthForm type="register" />} />
-                    <Route path="/poster" element={<PosterPage />} />
+                    <Route path="/poster" element={<ProtectedRoute><PosterPage /></ProtectedRoute>} />
                     {/* Route cần bảo vệ */}
                     <Route 
                         path="/generator" 
@@ -51,7 +51,7 @@ function AppRoutes() {
                         } 
                     />
                     {/* Route phân tích đối thủ - không cần authentication */}
-                    <Route path="/competitor-analysis" element={<CompetitorAnalysisPage />} />
+                    <Route path="/competitor-analysis" element={<ProtectedRoute><CompetitorAnalysisPage /></ProtectedRoute>} />
                     <Route 
                         path="/history"
                         element={<Navigate to="/history/analyses" replace />}

@@ -25,25 +25,23 @@ function Header() {
                     {/* Menu và Auth Buttons */}
                     <nav className="flex items-center space-x-4">
                         <Link 
+                            to="/" 
+                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
+                        >
+                            Trang chủ
+                        </Link>
+                        <Link 
                             to="/generator" 
                             className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
                         >
-                            Tạo Content
+                            Tạo nội dung
                         </Link>
                         <Link 
                             to="/poster" 
                             className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
                         >
-                            Poster Nhanh
+                            Tạo ảnh
                         </Link>
-                        {isAuthenticated && (
-                            <Link 
-                                to="/history/analyses" 
-                                className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
-                            >
-                                Lịch sử
-                            </Link>
-                        )}
                         
                         <Link 
                             to="/competitor-analysis" 
@@ -51,6 +49,15 @@ function Header() {
                         >
                             Phân tích Đối thủ
                         </Link>
+                           {isAuthenticated && (
+                            <Link 
+                                to="/history/analyses" 
+                                className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
+                            >
+                                Lịch sử
+                            </Link>
+                        )}
+                
                         
                         {isAuthenticated ? (
                             <div className="flex items-center space-x-3">

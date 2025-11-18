@@ -287,6 +287,11 @@ def generate_product_analysis_from_document(product_name: str, file_bytes: bytes
         full_document_text = extract_text_from_pdf(file_bytes)
     elif file_type == 'docx':
         full_document_text = extract_text_from_docx(file_bytes)
+    elif file_type == 'txt':
+        try:
+            full_document_text = file_bytes.decode('utf-8', errors='ignore')
+        except Exception:
+            full_document_text = ""
     else:
         logger.error("Unsupported file type for product analysis: %s", file_type)
         return None

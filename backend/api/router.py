@@ -160,11 +160,13 @@ def analyze_competitor(request: CompetitorAnalysisRequest):
     """
     Endpoint để phân tích đối thủ cạnh tranh.
     """
-    print(f"Bắt đầu phân tích đối thủ: {request.competitor_name} trên thị trường {request.market_description}")
+    print(f"Bắt đầu phân tích đối thủ: {request.competitor_name}")
     try:
-        result = analyze_competitor_market(request)
+        # analyze_competitor_market expects a competitor name (string)
+        result = analyze_competitor_market(request.competitor_name)
         if result:
-            return result
+            # Ensure response matches Pydantic model
+            return CompetitorAnalysisResult(**result)
     except Exception as e:
         print(f"Lỗi phân tích đối thủ: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi Server: Không thể phân tích đối thủ. Lỗi chi tiết: {str(e)}")
@@ -180,12 +182,23 @@ async def analyze_document(
     """
     Endpoint để phân tích tài liệu sản phẩm và lưu kết quả.
     """
-    if not file.filename.endswith(('.pdf', '.docx', '.txt')):
+    filename = (file.filename or "").lower()
+    if not filename.endswith(('.pdf', '.docx', '.txt')):
         raise HTTPException(status_code=400, detail="Định dạng file không hợp lệ. Chỉ chấp nhận PDF, DOCX, TXT.")
+
+    if filename.endswith('.pdf'):
+        file_type = 'pdf'
+    elif filename.endswith('.docx'):
+        file_type = 'docx'
+    else:
+        file_type = 'txt'
 
     try:
         contents = await file.read()
-        analysis_result = await generate_product_analysis_from_document(contents, file.filename)
+        analysis_result = generate_product_analysis_from_document("", contents, file_type)
+
+        if not analysis_result:
+            raise HTTPException(status_code=500, detail="Không thể phân tích nội dung tài liệu.")
 
         # Lưu kết quả vào DB
         analysis_record = AnalysisRecord(

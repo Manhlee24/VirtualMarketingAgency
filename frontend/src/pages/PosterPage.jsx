@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { Target } from 'lucide-react';
 
 const BASE_URL = "http://127.0.0.1:8000/api";
 
@@ -72,8 +73,13 @@ export default function PosterPage() {
 
   return (
     <div className="max-w-3xl mx-auto my-10 p-6 bg-white rounded-xl shadow">
-      <h2 className="text-3xl font-extrabold mb-4">Tạo Poster từ Ảnh Mẫu</h2>
-      <p className="text-gray-600 mb-6">Không cần đi qua Giai đoạn 1 và 2. Chỉ cần cung cấp tên sản phẩm, (tuỳ chọn) phong cách, và Ảnh mẫu bắt buộc.</p>
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full mb-4 shadow-lg">
+          <Target className="w-10 h-10 text-white" />
+        </div>
+        <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Tạo Poster Từ Ảnh Mẫu</h1>
+        <p className="text-lg text-gray-600 max-w-3xl mx-auto">Không cần đi qua Giai đoạn 1 và 2. Chỉ cần cung cấp tên sản phẩm, (tuỳ chọn) phong cách, và Ảnh mẫu bắt buộc.</p>
+      </div>
 
       {/* Limitations hidden per request */}
 

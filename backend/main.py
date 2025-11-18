@@ -37,4 +37,3 @@ app.include_router(api_router, prefix="/api", tags=["Core"])
 def read_root():
     return {"message": "Virtual Marketing Agency Backend - Ready"}
 
-# LƯU VÀ CHUYỂN SANG BƯỚC 3

@@ -12,7 +12,7 @@ function HomePage() {
             {/* Main Welcome Section */}
             <div className="text-center py-20 bg-white shadow-xl rounded-xl">
                 <h1 className="text-5xl font-extrabold text-gray-900 mb-4">
-                    Chào mừng đến với Virtual Marketing AI 👋
+                    Chào mừng đến với Marketing AI 👋
                 </h1>
                 <p className="text-xl text-gray-600 mb-8">
                     Tự động hóa quy trình phân tích sản phẩm, tạo nội dung marketing và sản xuất media bằng trí tuệ nhân tạo.
@@ -27,7 +27,7 @@ function HomePage() {
                             to="/generator"
                             className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-lg text-white bg-green-600 hover:bg-green-700 transition transform hover:scale-105"
                         >
-                            Bắt đầu Tạo Content Ngay!
+                            Bắt đầu Tạo Nội Dung Ngay!
                         </Link>
                     </>
                 ) : (
@@ -56,7 +56,7 @@ function HomePage() {
             {/* Features Section */}
             <div className="grid md:grid-cols-3 gap-6">
                 {/* Content Generator Feature */}
-                <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-8 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105">
+                <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-8 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105 flex flex-col justify-between ">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center">
                             <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,7 +81,7 @@ function HomePage() {
                 </div>
 
                 {/* Competitor Analysis Feature */}
-                <div className="bg-gradient-to-br from-purple-50 to-indigo-100 p-8 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105">
+                <div className="bg-gradient-to-br from-purple-50 to-indigo-100 p-8 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105 flex flex-col justify-between">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center">
                             <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,13 +103,11 @@ function HomePage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                         </svg>
                     </Link>
-                    <div className="mt-4 inline-flex items-center px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-semibold rounded-full">
-                        ✨ Tính năng mới
-                    </div>
+                    
                 </div>
 
                 {/* Poster Generator (Direct) */}
-                <div className="bg-gradient-to-br from-pink-50 to-rose-100 p-8 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105">
+                <div className="bg-gradient-to-br from-pink-50 to-rose-100 p-8 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105 flex flex-col justify-between">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-12 h-12 bg-rose-600 rounded-lg flex items-center justify-center">
                             <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

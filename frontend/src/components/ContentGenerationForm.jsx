@@ -148,9 +148,12 @@ function ContentGenerationForm() {
 						const formData = new FormData();
 						// In document mode, do NOT send product_name to avoid leaking previous input;
 						// backend will infer the product name from the document content.
-						formData.append("document", documentFile);
+						formData.append("file", documentFile);
 				const response = await axios.post(`${BASE_URL}/analyze_document`, formData, {
-					headers: { "Content-Type": "multipart/form-data" },
+					headers: {
+						"Content-Type": "multipart/form-data",
+						...(token ? { Authorization: `Bearer ${token}` } : {}),
+					},
 				});
 				data = response.data;
 					}
@@ -426,15 +429,6 @@ function ContentGenerationForm() {
 
   return (
     <div className="max-w-4xl mx-auto my-12 p-10 bg-white shadow-3xl rounded-3xl border border-indigo-100">
-      <header className="text-center mb-10">
-        <div className="inline-block tracking-widest text-indigo-700 bg-indigo-100 px-4 py-1 rounded-full text-xs font-bold uppercase mb-3">
-          VIRTUAL MARKETING AGENCY
-        </div>
-        <h2 className="text-4xl font-extrabold text-gray-900 leading-tight">
-          QUY TRÌNH MARKETING TỰ ĐỘNG VỚI AI
-        </h2>
-      </header>
-
 			{successMessage && (
 				<div className="mb-6 p-4 bg-green-50 text-green-800 rounded-lg border border-green-300 font-medium">
 					{successMessage}
