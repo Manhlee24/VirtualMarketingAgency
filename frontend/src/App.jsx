@@ -49,7 +49,11 @@ function AppRoutes() {
                         } 
                     />
                     {/* Route phân tích đối thủ - không cần authentication */}
-                    <Route path="/competitor-analysis" element={<CompetitorAnalysisPage />} />
+                    <Route 
+                    path="/competitor-analysis" 
+                    element={<ProtectedRoute>
+                        <CompetitorAnalysisPage />
+                        </ProtectedRoute>} />
                     <Route 
                         path="/history"
                         element={<Navigate to="/history/analyses" replace />}

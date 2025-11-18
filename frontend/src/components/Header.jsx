@@ -25,11 +25,25 @@ function Header() {
                     {/* Menu và Auth Buttons */}
                     <nav className="flex items-center space-x-4">
                         <Link 
+                            to="/" 
+                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
+                        >
+                            Trang chủ
+                        </Link>
+                        <Link 
                             to="/generator" 
                             className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
                         >
-                            Tạo Content
+                            Tạo bài viết
                         </Link>
+                        <Link 
+                            to="/competitor-analysis" 
+                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150 flex items-center gap-1"
+                        >
+                            Phân tích thị trường
+    
+                        </Link>
+
                         {isAuthenticated && (
                             <Link 
                                 to="/history/analyses" 
@@ -38,15 +52,7 @@ function Header() {
                                 Lịch sử
                             </Link>
                         )}
-                        
-                        <Link 
-                            to="/competitor-analysis" 
-                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150 flex items-center gap-1"
-                        >
-                            Phân tích Đối thủ
-                            <span className="px-1.5 py-0.5 bg-yellow-400 text-indigo-900 text-xs font-bold rounded">NEW</span>
-                        </Link>
-                        
+    
                         {isAuthenticated ? (
                             <div className="flex items-center space-x-3">
                                 <span className="text-indigo-200 text-sm font-semibold">
