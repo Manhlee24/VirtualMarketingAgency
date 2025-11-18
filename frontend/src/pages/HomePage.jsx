@@ -54,7 +54,7 @@ function HomePage() {
             </div>
 
             {/* Features Section */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-3 gap-6">
                 {/* Content Generator Feature */}
                 <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-8 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105">
                     <div className="flex items-center gap-3 mb-4">
@@ -103,7 +103,33 @@ function HomePage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                         </svg>
                     </Link>
-                
+                    <div className="mt-4 inline-flex items-center px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-semibold rounded-full">
+                        ✨ Tính năng mới
+                    </div>
+                </div>
+
+                {/* Poster Generator (Direct) */}
+                <div className="bg-gradient-to-br from-pink-50 to-rose-100 p-8 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-12 h-12 bg-rose-600 rounded-lg flex items-center justify-center">
+                            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4-4-4-4m6 8h10" />
+                            </svg>
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900">Tạo Poster từ Ảnh Mẫu</h3>
+                    </div>
+                    <p className="text-gray-700 mb-6 leading-relaxed">
+                        Bỏ qua Giai đoạn 1 và 2. Cung cấp ảnh mẫu bắt buộc, tên sản phẩm và (tuỳ chọn) phong cách để AI chỉnh sửa/tạo poster.
+                    </p>
+                    <Link
+                        to="/poster"
+                        className="inline-flex items-center px-5 py-3 bg-rose-600 text-white font-semibold rounded-lg hover:bg-rose-700 transition"
+                    >
+                        Tạo Poster nhanh
+                        <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                    </Link>
                 </div>
             </div>
         </div>

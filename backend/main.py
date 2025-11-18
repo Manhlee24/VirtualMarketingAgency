@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware  # <<-- THAY ĐỔI Ở ĐÂY
 from api.router import router as api_router
-from api.auth_router import router as auth_router
+from api.auth_router import router as auth_router, get_current_user_email
+from api.history_router import history_router
 import sys
 import os
 
@@ -29,8 +30,9 @@ app.add_middleware(
     allow_headers=["*"],               # Cho phép tất cả các header
 )
 
-app.include_router(api_router, prefix="/api")
-app.include_router(auth_router, prefix="/api/auth")
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(history_router, prefix="/api/history", tags=["History"])
+app.include_router(api_router, prefix="/api", tags=["Core"])
 @app.get("/")
 def read_root():
     return {"message": "Virtual Marketing Agency Backend - Ready"}

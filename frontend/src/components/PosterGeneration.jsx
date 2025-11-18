@@ -4,8 +4,6 @@ import React from "react";
 
 function PosterGeneration({
   analysisData,
-  adCopy,
-  setAdCopy,
   styleShort,
   setStyleShort,
   setReferenceImageFile,
@@ -37,26 +35,17 @@ function PosterGeneration({
         onClick={goBack}
         className="mb-6 text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center"
       >
-        &larr; Quay lại Kết Quả Phân Tích (Giai đoạn 1)
+        &larr; Quay lại Kết Quả Phân Tích
       </button>
 
       <h3 className="text-3xl font-extrabold text-gray-900 mb-6">
-        GIAI ĐOẠN 3: Sản Xuất Media (Poster) 🖼️
+        Tạo Poster 🖼️
       </h3>
 
       <div className="p-6 bg-white rounded-xl shadow-lg border border-gray-200 mb-6">
-        <h4 className="text-lg font-bold text-gray-800 mb-3">Nguồn Ad Copy</h4>
-        <p className="text-sm text-gray-600 mb-2">
-          Bạn có thể dùng nội dung đã tạo ở Giai đoạn 2 (nếu có) hoặc nhập Ad Copy thủ công bên dưới.
-        </p>
-        <textarea
-          value={adCopy}
-          onChange={(e) => setAdCopy(e.target.value)}
-          placeholder="Dán hoặc nhập Ad Copy tại đây..."
-          rows={6}
-          className="w-full px-3 py-2 border rounded-lg mb-3"
-        />
-
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+          Ảnh mẫu là <strong>bắt buộc</strong> để hệ thống chỉnh sửa/tạo poster.
+        </div>
         <label className="block text-sm font-semibold text-gray-700 mb-2">
           Yêu cầu phong cách ngắn (ví dụ: "minimal, bright, product on marble table")
         </label>
@@ -69,7 +58,7 @@ function PosterGeneration({
         />
 
         <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Hình ảnh tham khảo (tùy chọn)
+          Ảnh mẫu (bắt buộc)
         </label>
         <input
           type="file"
@@ -96,6 +85,8 @@ function PosterGeneration({
           {isGeneratingImage ? "ĐANG TẠO POSTER AI..." : "TẠO POSTER"}
         </button>
       </div>
+
+      {/* Limitations intentionally hidden per request */}
 
       {(generatedPoster || imageError) && (
         <div className="p-8 bg-pink-50 rounded-xl border-2 border-pink-300 shadow-inner">

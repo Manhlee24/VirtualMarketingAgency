@@ -20,6 +20,38 @@ class Format(str, Enum):
     VIDEO_SCRIPT = "Kịch bản video ngắn (Dưới 60 giây)"
 
 
+# ===== New enums: Ad copy style, CTA intent, copy intensity =====
+class AdCopyStyle(str, Enum):
+    HUMAN_INTEREST = "human_interest"
+    REASON_WHY = "reason_why"
+    EDUCATIONAL = "educational"
+    INSTITUTIONAL = "institutional"
+    SUGGESTIVE = "suggestive"
+    SOCIAL_PROOF = "social_proof"
+    SAVINGS = "savings"
+    X_REASONS = "x_reasons"
+    NO_BRAINER = "no_brainer"
+    OUTCOME = "outcome"
+    STATISTIC = "statistic"
+    US_VS_THEM = "us_vs_them"
+    INGREDIENTS = "ingredients"
+    DISCOUNT = "discount"
+
+
+class CTAIntent(str, Enum):
+    SALES = "sales"
+    LEAD = "lead"
+    ENGAGEMENT = "engagement"
+    APP_INSTALL = "app_install"
+    AWARENESS = "awareness"
+
+
+class CopyIntensity(str, Enum):
+    SOFT = "soft"
+    NEUTRAL = "neutral"
+    HARD = "hard"
+
+
 # ===== Content generation (requests/responses) =====
 class ContentGenerationRequest(BaseModel):
     product_name: str = Field(..., description="Tên sản phẩm gốc.")
@@ -28,6 +60,20 @@ class ContentGenerationRequest(BaseModel):
     selected_tone: Tone = Field(..., description="Giọng điệu nội dung đã chọn.")
     selected_format: Format = Field(..., description="Định dạng nội dung đã chọn.")
     infor: str = Field(..., description="Các thông số sản phẩm nổi bật.")
+    # Optional advanced controls
+    ad_copy_style: Optional[AdCopyStyle] = Field(None, description="(Optional) Specific ad copy style to enforce, e.g. human_interest, reason_why, social_proof.")
+    cta_intent: Optional[CTAIntent] = Field(None, description="(Optional) CTA intent: sales, lead, engagement, app_install, awareness.")
+    copy_intensity: Optional[CopyIntensity] = Field(None, description="(Optional) Copy intensity: soft, neutral, hard. If omitted the system auto-selects.")
+    # Additional optional inputs from user (enhanced controls)
+    industry: Optional[str] = Field(None, description="(Optional) Lĩnh vực/ngành hàng.")
+    seo_enabled: Optional[bool] = Field(False, description="(Optional) Bật chế độ SEO: ưu tiên chèn từ khoá và cấu trúc phù hợp SEO.")
+    language: Optional[str] = Field("vi", description="(Optional) Ngôn ngữ đầu ra, ví dụ: 'vi', 'en'. Mặc định 'vi'.")
+    category: Optional[str] = Field(None, description="(Optional) Thể loại nội dung, ví dụ: Quảng cáo, Giới thiệu, Hướng dẫn.")
+    topic: Optional[str] = Field(None, description="(Optional) Chủ đề bạn muốn viết.")
+    desired_length: Optional[int] = Field(None, description="(Optional) Độ dài mong muốn (số từ).")
+    custom_title: Optional[str] = Field(None, description="(Optional) Tiêu đề gợi ý/tự đặt.")
+    key_points: Optional[str] = Field(None, description="(Optional) Mô tả các ý chính / yêu cầu (có thể xuống dòng).")
+    required_keywords: Optional[str] = Field(None, description="(Optional) Từ khoá cần có (phân tách bằng dấu phẩy).")
 
 
 class GeneratedContentResponse(BaseModel):
@@ -108,13 +154,19 @@ class SaveContentRequest(BaseModel):
     infor: str
     title: str
     content: str
+    # Preserve optional metadata when saving generated content
+    ad_copy_style: Optional[str] = None
+    cta_intent: Optional[str] = None
+    copy_intensity: Optional[str] = None
 
 
 class SaveImageRequest(BaseModel):
     product_name: str
-    ad_copy: str
-    usp: str
-    infor: str
+    # These fields are deprecated and no longer required for image generation.
+    # Keep them optional to maintain backward compatibility with existing DB schema.
+    ad_copy: Optional[str] = ""
+    usp: Optional[str] = ""
+    infor: Optional[str] = ""
     style_short: Optional[str] = None
     image_url: str
     prompt_used: Optional[str] = None
@@ -150,9 +202,10 @@ class ContentRecordOut(BaseModel):
 class ImageRecordOut(BaseModel):
     id: int
     product_name: str
-    ad_copy: str
-    usp: str
-    infor: str
+    # Deprecated fields; may be empty strings for records created after simplification
+    ad_copy: Optional[str]
+    usp: Optional[str]
+    infor: Optional[str]
     style_short: Optional[str]
     image_url: str
     prompt_used: Optional[str]

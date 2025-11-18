@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext.jsx";
 
-const BASE_URL = "http://127.0.0.1:8000/api/v1";
+const BASE_URL = "http://127.0.0.1:8000/api";
 
 export default function History() {
   const { token } = useAuth();

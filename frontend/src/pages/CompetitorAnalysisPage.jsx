@@ -7,7 +7,7 @@ import {
     Clock, CheckCircle, AlertCircle, Download, Share2
 } from 'lucide-react';
 
-const API_BASE_URL = "http://localhost:8000/api/v1";
+const API_BASE_URL = "http://localhost:8000/api";
 
 function CompetitorAnalysisPage() {
     const [competitorName, setCompetitorName] = useState('');

@@ -40,10 +40,25 @@ logger.info("OPENAI_API_KEY present: %s", bool(OPENAI_API_KEY))
 logger.info("openai_client available: %s", bool(openai_client))
 logger.info("Cloudinary configured: %s", bool(os.getenv("CLOUDINARY_CLOUD_NAME")))
 
+# Known limitations for vision/editing models
+IMAGE_LIMITATIONS = [
+    "Medical images: Not suitable for interpreting specialized medical images or medical advice.",
+    "Non-English: May not perform optimally with non-Latin text (e.g., Japanese, Korean).",
+    "Small text: Prefer enlarging text to improve readability; avoid cropping important details.",
+    "Rotation: May misinterpret rotated or upside-down text and images.",
+    "Visual elements: May struggle with graphs or styles like solid/dashed/dotted lines.",
+    "Spatial reasoning: Struggles with precise localization tasks (e.g., chess positions).",
+    "Accuracy: May generate incorrect descriptions or captions.",
+    "Image shape: Struggles with panoramic and fisheye images.",
+    "Metadata and resizing: Ignores original filenames/metadata; images may be resized.",
+    "Counting: Provides approximate object counts only.",
+    "CAPTCHAS: Submission of CAPTCHAs is blocked for safety reasons.",
+]
+
 # Cập nhật model response
  
 
-def _expand_style_with_gemini(style_short: str, infor: str, selected_usp: str, ad_copy: str) -> Optional[str]:
+def _expand_style_with_gemini(style_short: str) -> Optional[str]:
     """
     Gọi Gemini để mở rộng yêu cầu chỉnh sửa/thay đổi ngắn thành prompt chi tiết (cho editing/inpainting).
     """
@@ -51,12 +66,11 @@ def _expand_style_with_gemini(style_short: str, infor: str, selected_usp: str, a
         return None
 
     instruction = (
-        f"You are an expert prompt engineer for image editing (inpainting). The user wants to edit an existing image.\n"
-        f"Expand the short style request below into a **detailed, concise prompt** (limit 100 words) describing the **exact new content and style** to be rendered in the masked area of the image.\n"
-        f"Focus on the desired output's composition, camera angle, lighting, color palette, and textures, relative to the existing image.\n"
-        f"Key product highlight: {infor}. Ad copy focus: {ad_copy}.\n\n"
+        "You are an expert prompt engineer for image editing (inpainting). The user wants to edit an existing image.\n"
+        "Expand the short style request below into a detailed, concise prompt (limit 100 words) describing the exact new content and style to be rendered in the edited image.\n"
+        "Focus on the desired output's composition, camera angle, lighting, color palette, and textures, relative to the existing image.\n\n"
         f"Short style request/desired change: {style_short}\n\n"
-        f"Output only the detailed editing prompt, limited to 100 words."
+        "Output only the detailed editing prompt, limited to 100 words."
     )
 
     if not style_short:
@@ -150,10 +164,6 @@ def _expand_style_with_gemini(style_short: str, infor: str, selected_usp: str, a
 
 def generate_marketing_poster(
     product_name: str,
-    ad_copy: str,
-    persona: str,
-    infor: str,
-    usp: str,
     style_short: Optional[str] = None,
     reference_image_bytes: Optional[bytes] = None,
     size: str = "1024x1024",
@@ -166,26 +176,22 @@ def generate_marketing_poster(
             reference_url = upload_to_cloudinary(reference_image_bytes)
             print(f"Đã upload ảnh tham khảo lên Cloudinary: {reference_url}")
         base_prompt = f"""
-Create a premium, high-quality digital advertising poster for {product_name}.
-Product details: {infor}
-Target persona: {persona}
-USP: {usp}
-Ad copy sample: {ad_copy}
+Create a premium, high-quality product advertising image for {product_name}.
 
 Requirements:
 - Modern, minimalist, cinematic lighting.
 - Product centered, realistic materials and reflections.
-- No text overlays in the image itself (UI/text will be added separately).
+- Do NOT add text overlays in the image itself (UI/text will be added separately).
 """.strip()
 
         detailed_style = None
         if style_short:
-            detailed_style = _expand_style_with_gemini(style_short, product_name, infor, persona, usp, ad_copy)
+            detailed_style = _expand_style_with_gemini(style_short)
 
         # Chọn prompt chính
         if style_short and detailed_style:
             final_prompt = detailed_style.strip()
-            final_prompt = final_prompt + f"\n\nProduct context: {product_name}. Key info: {infor}. USP: {usp}."
+            final_prompt = final_prompt + f"\n\nProduct context: {product_name}."
         else:
             final_prompt = base_prompt
 
@@ -292,9 +298,6 @@ def upload_to_cloudinary(image_bytes: bytes, public_id_prefix: str = "ref") -> O
 
 def generate_marketing_poster(
     product_name: str,
-    ad_copy: str,
-    infor: str,
-    usp: str,
     style_short: Optional[str] = None,
     # Thêm ảnh gốc và tùy chọn mask
     original_image_bytes: Optional[bytes] = None,
@@ -306,17 +309,11 @@ def generate_marketing_poster(
     try:
         # Kiểm tra ảnh gốc (bắt buộc cho Edit)
         if not original_image_bytes:
-            logger.info("No original image bytes provided; returning mock placeholder.")
-            final_prompt = "No original image provided for editing."
-            placeholder = "https://via.placeholder.com/1024x1024.png?text=NO+IMAGE+FOR+EDIT"
-            return ImageGenerationResponse(
-                image_url=placeholder, 
-                prompt_used=final_prompt,
-                reference_url=None
-            )
+            # Enforce requirement: editing requires a reference/original image
+            raise Exception("Reference image is required for editing.")
 
         # Xử lý detailed style (prompt mô tả thay đổi)
-        detailed_style = _expand_style_with_gemini(style_short or "", infor, usp, ad_copy)
+        detailed_style = _expand_style_with_gemini(style_short or "")
 
         # Chọn prompt chính
         if detailed_style:
@@ -324,10 +321,28 @@ def generate_marketing_poster(
         elif style_short:
             final_prompt = style_short.strip()
         else:
-            final_prompt = f"Edit the image to better reflect the product: {product_name} with key details: {infor}."
+            final_prompt = f"Edit the image to better showcase the product: {product_name}."
 
         # Thêm thông tin context vào prompt cuối cùng
-        final_prompt = f"{final_prompt}. Product context: {product_name}. USP: {usp}."
+        final_prompt = f"{final_prompt}. Product context: {product_name}."
+
+        # Add safety and known limitations hints to avoid violating edit constraints
+        limitations = (
+            "\n\nSafety and Limits:\n"
+            "- Do not interpret or generate medical diagnostic content.\n"
+            "- Avoid reading or relying on non-Latin text in the image.\n"
+            "- Prefer enlarging small text but do not crop important details.\n"
+            "- Assume rotated/upside-down text may be misread; do not rely on it.\n"
+            "- Avoid generating charts/graphs deciphering color-coded styles.\n"
+            "- Do not perform precise spatial reasoning (e.g., chess positions).\n"
+            "- Descriptions may be inaccurate; avoid hallucinated captions.\n"
+            "- Do not expect panoramic/fisheye geometric accuracy.\n"
+            "- Original filenames/metadata are ignored; resizing may occur.\n"
+            "- Do not count objects precisely; avoid approximate counting tasks.\n"
+            "- Do NOT attempt to solve CAPTCHA-like images.\n"
+            "- Do NOT add text overlays to the image."
+        )
+        final_prompt += limitations
 
         # Gọi OpenAI Images Edit API
         if openai_client:

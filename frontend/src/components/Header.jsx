@@ -25,25 +25,17 @@ function Header() {
                     {/* Menu và Auth Buttons */}
                     <nav className="flex items-center space-x-4">
                         <Link 
-                            to="/" 
-                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
-                        >
-                            Trang chủ
-                        </Link>
-                        <Link 
                             to="/generator" 
                             className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
                         >
-                            Tạo bài viết
+                            Tạo Content
                         </Link>
                         <Link 
-                            to="/competitor-analysis" 
-                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150 flex items-center gap-1"
+                            to="/poster" 
+                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
                         >
-                            Phân tích thị trường
-    
+                            Poster Nhanh
                         </Link>
-
                         {isAuthenticated && (
                             <Link 
                                 to="/history/analyses" 
@@ -52,7 +44,14 @@ function Header() {
                                 Lịch sử
                             </Link>
                         )}
-    
+                        
+                        <Link 
+                            to="/competitor-analysis" 
+                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
+                        >
+                            Phân tích Đối thủ
+                        </Link>
+                        
                         {isAuthenticated ? (
                             <div className="flex items-center space-x-3">
                                 <span className="text-indigo-200 text-sm font-semibold">

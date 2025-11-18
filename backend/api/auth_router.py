@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
+from typing import Optional
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from schemas.auth import UserCreate, UserLogin, UserOut, Token, TokenLogin
 from models.user import User
 from db import get_db, init_db
-from core.auth import get_password_hash, verify_password, create_access_token
+from core.auth import get_password_hash, verify_password, create_access_token, decode_access_token
 
 router = APIRouter()
 
@@ -60,3 +61,18 @@ def login(form_data: UserLogin, db: Session = Depends(get_db)):
     access_token = create_access_token(
         {"user_id": user.email}, expires_delta=timedelta(minutes=60 * 24))
     return {"access_token": access_token, "token_type": "bearer", "message": "Đăng nhập thành công!", "name": user.name}
+
+
+# Merged from auth_utils: helper to extract current user
+def get_current_user_email(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid Authorization header")
+    token = authorization.split()[1]
+    payload = decode_access_token(token)
+    if not payload or not payload.get("user_id"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    email = payload["user_id"]
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return email

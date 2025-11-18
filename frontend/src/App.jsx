@@ -11,6 +11,7 @@ import HistoryContents from "./pages/HistoryContents.jsx";
 import HistoryImages from "./pages/HistoryImages.jsx";
 import AuthForm from "./pages/AuthForm.jsx";
 import CompetitorAnalysisPage from "./pages/CompetitorAnalysisPage.jsx";
+import PosterPage from "./pages/PosterPage.jsx";
 import { AuthProvider, useAuth } from "../context/AuthContext.jsx";
 
 // Component bảo vệ route
@@ -39,6 +40,7 @@ function AppRoutes() {
                     <Route path="/" element={<HomePage />} />
                     <Route path="/login" element={<AuthForm type="login" />} />
                     <Route path="/register" element={<AuthForm type="register" />} />
+                    <Route path="/poster" element={<PosterPage />} />
                     {/* Route cần bảo vệ */}
                     <Route 
                         path="/generator" 
@@ -49,11 +51,7 @@ function AppRoutes() {
                         } 
                     />
                     {/* Route phân tích đối thủ - không cần authentication */}
-                    <Route 
-                    path="/competitor-analysis" 
-                    element={<ProtectedRoute>
-                        <CompetitorAnalysisPage />
-                        </ProtectedRoute>} />
+                    <Route path="/competitor-analysis" element={<CompetitorAnalysisPage />} />
                     <Route 
                         path="/history"
                         element={<Navigate to="/history/analyses" replace />}

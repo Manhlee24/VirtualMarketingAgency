@@ -44,11 +44,11 @@ function Phase2And3Form({
         onClick={goToStep2}
         className="mb-6 text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center"
       >
-        &larr; Quay lại Kết Quả Phân Tích (Giai đoạn 1)
+        &larr; Quay lại Kết Quả Phân Tích
       </button>
 
       <h3 className="text-3xl font-extrabold text-gray-900 mb-6">
-        GIAI ĐOẠN 2 & 3: Sáng Tạo Nội Dung & Media ✨
+        Sáng Tạo Nội Dung & Media ✨
       </h3>
 
       {/* Form Chọn Biến Số Marketing (Giai đoạn 2 Input) */}
@@ -65,14 +65,17 @@ function Phase2And3Form({
             <select
               value={selectedUsp}
               onChange={(e) => setSelectedUsp(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-blue-300"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-blue-300 max-w-full overflow-hidden"
               required
             >
-              {analysisData.usps.map((usp, index) => (
-                <option key={index} value={usp}>
-                  {usp}
-                </option>
-              ))}
+              {analysisData.usps.map((usp, index) => {
+                const label = typeof usp === 'string' && usp.length > 80 ? usp.slice(0, 80) + '…' : usp;
+                return (
+                  <option key={index} value={usp} title={usp}>
+                    {label}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -158,7 +161,7 @@ function Phase2And3Form({
       {/* Tùy chọn Poster - CHỈ HIỆN SAU KHI CÓ NỘI DUNG */}
       {generatedContent && (
         <div className="p-6 bg-white rounded-xl shadow-lg border border-gray-200 mb-6">
-          <h4 className="text-lg font-bold text-gray-800 mb-3">Tùy chọn Poster (Giai đoạn 3)</h4>
+          <h4 className="text-lg font-bold text-gray-800 mb-3">Tùy chọn Poster</h4>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             Yêu cầu phong cách ngắn (ví dụ: "minimal, bright, product on marble table")
           </label>

@@ -46,7 +46,6 @@ function ContentGenerationForm() {
   const [selectedFormat, setSelectedFormat] = useState(FormatOptions[0].value);
   const [generatedContent, setGeneratedContent] = useState(null);
   const [generatedPoster, setGeneratedPoster] = useState(null);
-	const [adCopy, setAdCopy] = useState("");
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageError, setImageError] = useState(null);
   const [styleShort, setStyleShort] = useState("");
@@ -62,7 +61,18 @@ function ContentGenerationForm() {
 		const [savedContent, setSavedContent] = useState(false);
 		const [savedImage, setSavedImage] = useState(false);
 
-  const BASE_URL = "http://127.0.0.1:8000/api/v1";
+		// --- NEW OPTIONAL INPUT STATES ---
+		const [industry, setIndustry] = useState("");
+		const [seoEnabled, setSeoEnabled] = useState(false);
+		const [language, setLanguage] = useState("vi"); // 'vi' | 'en' | others
+		const [category, setCategory] = useState("");
+		const [topic, setTopic] = useState("");
+		const [desiredLength, setDesiredLength] = useState(""); // keep as string then parseInt
+		const [customTitle, setCustomTitle] = useState("");
+		const [keyPoints, setKeyPoints] = useState("");
+		const [requiredKeywords, setRequiredKeywords] = useState("");
+
+	 const BASE_URL = "http://127.0.0.1:8000/api";
 	const { token } = useAuth();
 	const location = useLocation();
 
@@ -88,7 +98,6 @@ function ContentGenerationForm() {
 				if (preAnalysis.usps.length > 0) setSelectedUsp(preAnalysis.usps[0]);
 				setGeneratedContent(null);
 				setGeneratedPoster(null);
-				setAdCopy("");
 				setStyleShort("");
 				setCurrentStep(2);
 			} else if (resume === "content") {
@@ -106,7 +115,6 @@ function ContentGenerationForm() {
 				if (preAnalysis.usps.length > 0) setSelectedUsp(preAnalysis.usps[0]);
 				const preContent = { title: r.title, content: r.content };
 				setGeneratedContent(preContent);
-				setAdCopy(r.content || "");
 				setStyleShort("");
 				// Jump to poster creation directly
 				setCurrentStep(4);
@@ -148,7 +156,6 @@ function ContentGenerationForm() {
 					}
 					// Reset content/media states when a new analysis completes
 					setGeneratedContent(null);
-					setAdCopy("");
 					setGeneratedPoster(null);
 					setStyleShort("");
 					setReferenceImageFile(null);
@@ -167,11 +174,11 @@ function ContentGenerationForm() {
   };
 
 	// Save handlers
-	const saveAnalysis = async () => {
+	const saveAnalysis = async (analysisData) => {
 		if (!analysisData || !token) return;
 		setSavingAnalysis(true);
 			try {
-			await axios.post(`${BASE_URL}/save_analysis`, analysisData, {
+			await axios.post(`${BASE_URL}/history/analyses`, analysisData, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 				setSavedAnalysis(true);
@@ -185,21 +192,11 @@ function ContentGenerationForm() {
 		}
 	};
 
-	const saveContent = async () => {
-		if (!generatedContent || !analysisData || !token) return;
+	const saveContent = async (contentData) => {
+		if (!contentData || !token) return;
 		setSavingContent(true);
 			try {
-			const payload = {
-				product_name: analysisData.product_name,
-				target_persona: analysisData.target_persona,
-				selected_usp: selectedUsp,
-				selected_tone: selectedTone,
-				selected_format: selectedFormat,
-				infor: analysisData.infor,
-				title: generatedContent.title,
-				content: generatedContent.content,
-			};
-			await axios.post(`${BASE_URL}/save_content`, payload, {
+			await axios.post(`${BASE_URL}/history/contents`, contentData, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 				setSavedContent(true);
@@ -219,15 +216,12 @@ function ContentGenerationForm() {
 			try {
 			const payload = {
 				product_name: analysisData.product_name,
-				ad_copy: adCopy,
-				usp: selectedUsp,
-				infor: analysisData.infor,
 				style_short: styleShort,
 				image_url: generatedPoster.image_url,
 				prompt_used: generatedPoster.prompt_used,
 				reference_url: generatedPoster.reference_url || null,
 			};
-			await axios.post(`${BASE_URL}/save_image`, payload, {
+			await axios.post(`${BASE_URL}/history/images`, payload, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 				setSavedImage(true);
@@ -259,14 +253,21 @@ function ContentGenerationForm() {
         selected_tone: selectedTone,
         selected_format: selectedFormat,
         infor: analysisData.infor,
+				// optional advanced fields
+				industry: industry || undefined,
+				seo_enabled: !!seoEnabled,
+				language: language || undefined,
+				category: category || undefined,
+				topic: topic || undefined,
+				desired_length: desiredLength ? parseInt(desiredLength, 10) : undefined,
+				custom_title: customTitle || undefined,
+				key_points: keyPoints || undefined,
+				required_keywords: requiredKeywords || undefined,
       };
 
       const response = await axios.post(`${BASE_URL}/generate_content`, requestData);
 			setGeneratedContent(response.data);
-			// Prefill ad copy for poster if content was generated
-			if (response.data?.content) {
-				setAdCopy(response.data.content);
-			}
+			// Content generation no longer required for poster step
       // Sau khi tạo content thành công, chuyển sang Giai đoạn 3 (hiển thị Form Poster)
       setCurrentStep(3); 
     } catch (err) {
@@ -286,18 +287,14 @@ function ContentGenerationForm() {
     setGeneratedPoster(null);
 
     try {
-			if (!adCopy || adCopy.trim().length < 10) {
-				setImageError("Vui lòng nhập Ad Copy (ít nhất 10 ký tự) trước khi tạo Poster.");
+			if (!referenceImageFile) {
+				setImageError("Vui lòng chọn Ảnh mẫu trước khi tạo Poster.");
 				return;
 			}
 			const formData = new FormData();
 			formData.append("product_name", analysisData.product_name);
-			formData.append("ad_copy", adCopy);
-			formData.append("persona", analysisData.target_persona);
-			formData.append("usp", selectedUsp);
-			formData.append("infor", analysisData.infor);
 			if (styleShort) formData.append("style_short", styleShort);
-			if (referenceImageFile) formData.append("reference_image", referenceImageFile);
+			formData.append("reference_image", referenceImageFile);
 
 			const response = await axios.post(`${BASE_URL}/generate_poster`, formData, {
 				headers: { "Content-Type": "multipart/form-data" },
@@ -339,11 +336,13 @@ function ContentGenerationForm() {
 					goBackToInput={() => {
 						// Reset all downstream states when returning to step 1
 						setGeneratedContent(null);
-						setAdCopy("");
 						setGeneratedPoster(null);
 						setStyleShort("");
 						setReferenceImageFile(null);
 						setReferenceImagePreview(null);
+						setAnalysisData(null);
+						setProductName("");
+						setDocumentFile(null);
 						setCurrentStep(1);
 					}}
 								onSaveAnalysis={saveAnalysis}
@@ -363,13 +362,38 @@ function ContentGenerationForm() {
 					setSelectedFormat={setSelectedFormat}
 					selectedTone={selectedTone}
 					setSelectedTone={setSelectedTone}
+					industry={industry}
+					setIndustry={setIndustry}
+					seoEnabled={seoEnabled}
+					setSeoEnabled={setSeoEnabled}
+					language={language}
+					setLanguage={setLanguage}
+					category={category}
+					setCategory={setCategory}
+					topic={topic}
+					setTopic={setTopic}
+					desiredLength={desiredLength}
+					setDesiredLength={setDesiredLength}
+					customTitle={customTitle}
+					setCustomTitle={setCustomTitle}
+					keyPoints={keyPoints}
+					setKeyPoints={setKeyPoints}
+					requiredKeywords={requiredKeywords}
+					setRequiredKeywords={setRequiredKeywords}
 					handleContentGeneration={handleContentGeneration}
 					generatedContent={generatedContent}
 					formatContent={formatContent}
 					loading={loading}
 					goBack={() => { setCurrentStep(2); }}
 					goToPoster={() => setCurrentStep(4)}
-							onSaveContent={saveContent}
+							onSaveContent={() => saveContent({
+								...analysisData,
+								selected_usp: selectedUsp,
+								selected_format: selectedFormat,
+								selected_tone: selectedTone,
+								title: generatedContent.title,
+								content: generatedContent.content,
+							})}
 							savingContent={savingContent}
 							savedContent={savedContent}
 				/>
@@ -380,8 +404,6 @@ function ContentGenerationForm() {
 			return (
 				<PosterGeneration
 					analysisData={analysisData}
-					adCopy={adCopy}
-					setAdCopy={setAdCopy}
 					styleShort={styleShort}
 					setStyleShort={setStyleShort}
 					setReferenceImageFile={setReferenceImageFile}

@@ -5,13 +5,14 @@ import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 
-const BASE_URL = "http://127.0.0.1:8000/api/v1";
+const BASE_URL = "http://127.0.0.1:8000/api";
 
 export default function HistoryAnalyses() {
   const { token } = useAuth();
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expanded, setExpanded] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,6 +50,14 @@ export default function HistoryAnalyses() {
     navigate("/generator?resume=analysis");
   };
 
+  const toggle = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  const summarize = (arr = [], n = 2) => {
+    if (!Array.isArray(arr) || arr.length === 0) return "";
+    const head = arr.slice(0, n);
+    const more = arr.length - head.length;
+    return head.join(" | ") + (more > 0 ? ` +${more} ...` : "");
+  };
+
   if (!token) return <div className="p-6">Vui lòng đăng nhập để xem lịch sử.</div>;
   if (loading) return <div className="p-6">Đang tải lịch sử phân tích...</div>;
 
@@ -70,32 +79,46 @@ export default function HistoryAnalyses() {
       {analyses.length === 0 ? (
         <p className="text-gray-600">Chưa có bản ghi.</p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {analyses.map((r) => (
-            <div key={r.id} className="p-4 bg-white rounded border shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-indigo-700">{r.product_name}</div>
-                  <div className="text-sm text-gray-600">{new Date(r.created_at).toLocaleString()}</div>
+            <div key={r.id} className="p-2 text-xs bg-white rounded border shadow-sm card-hover">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-indigo-700 clamp-1 text-sm" title={r.product_name}>{r.product_name}</div>
+                  <div className="text-[10px] text-gray-600">{new Date(r.created_at).toLocaleString()}</div>
                 </div>
                 <button
                   onClick={() => handleDelete(r.id)}
-                  className="text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
+                  className="text-[10px] bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded whitespace-nowrap"
                 >
                   Xóa
                 </button>
               </div>
-              <div className="mt-2 text-sm"><span className="font-semibold">Persona:</span> {r.target_persona}</div>
-              <div className="mt-2 text-sm"><span className="font-semibold">Infor:</span> {r.infor}</div>
-              <div className="mt-2 text-sm"><span className="font-semibold">USPs:</span> {r.usps.join(" | ")}</div>
-              <div className="mt-2 text-sm"><span className="font-semibold">Pain points:</span> {r.pain_points.join(" | ")}</div>
-              <div className="mt-3 text-right">
-                <button
-                  onClick={() => handleContinue(r)}
-                  className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-semibold"
-                >
-                  Tiếp tục tạo nội dung
+              {!expanded[r.id] ? (
+                <>
+                  <div className="mt-1 text-[11px]"><span className="font-semibold">Persona:</span> <span className="clamp-1 inline-block align-top" title={r.target_persona}>{r.target_persona}</span></div>
+                  <div className="mt-1 text-[11px] text-gray-600">USP: {r.usps?.length || 0} | Pain: {r.pain_points?.length || 0}</div>
+                </>
+              ) : (
+                <>
+                  <div className="mt-2 text-sm"><span className="font-semibold">Persona:</span> {r.target_persona}</div>
+                  <div className="mt-1 text-sm"><span className="font-semibold">Infor:</span> {r.infor}</div>
+                  <div className="mt-1 text-sm"><span className="font-semibold">USPs:</span> {r.usps.join(' | ')}</div>
+                  <div className="mt-1 text-sm"><span className="font-semibold">Pain points:</span> {r.pain_points.join(' | ')}</div>
+                </>
+              )}
+              <div className="mt-2 flex items-center justify-between">
+                <button onClick={() => toggle(r.id)} className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-800">
+                  {expanded[r.id] ? 'Thu gọn' : 'Xem chi tiết'}
                 </button>
+                <div className="text-right">
+                  <button
+                    onClick={() => handleContinue(r)}
+                    className="text-[11px] bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded font-semibold"
+                  >
+                    Tiếp tục tạo nội dung
+                  </button>
+                </div>
               </div>
             </div>
           ))}

@@ -5,6 +5,10 @@ import React from "react";
 function AnalysisResult({ analysisData, goToContent, goToPoster, goBackToInput, onSaveAnalysis, saving, saved }) {
   const hasData = analysisData.usps.length > 0 || analysisData.target_persona.length > 0;
 
+  const handleSave = () => {
+    onSaveAnalysis(analysisData);
+  };
+
   return (
     <div className="mt-10 pt-8 border-t-2 border-gray-200">
       <button
@@ -18,7 +22,7 @@ function AnalysisResult({ analysisData, goToContent, goToPoster, goBackToInput, 
         <>
           <h3 className="text-3xl font-extrabold text-gray-900 mb-6">Kết quả phân tích</h3>
           <p className="text-gray-700 mb-8 border-l-4 border-green-500 pl-4 italic bg-green-50 p-4 rounded-md">
-            Bộ dữ liệu cấu trúc đã sẵn sàng cho: {" "}
+            Bộ dữ liệu cấu trúc đã sẵn sàng cho:{" "}
             <span className="font-bold text-indigo-700">{analysisData.product_name}</span>.
           </p>
 
@@ -64,7 +68,7 @@ function AnalysisResult({ analysisData, goToContent, goToPoster, goBackToInput, 
               TẠO POSTER
             </button>
             <button
-              onClick={onSaveAnalysis}
+              onClick={handleSave}
               disabled={saving}
               className={`w-full flex items-center justify-center ${saving ? 'bg-gray-400' : (saved ? 'bg-green-600' : 'bg-indigo-600 hover:bg-indigo-700')} text-white font-extrabold py-3 rounded-lg text-xl transition duration-300 shadow-lg`}
             >
