@@ -65,66 +65,7 @@ FRAMEWORK_HINTS = {
 # for Facebook posts to help distribution and discoverability.
 
 
-def suggest_hashtags(request) -> list:
-    """Generate 3-6 simple Vietnamese hashtags from product/persona/usp/infor.
-
-    Heuristic approach: split meaningful tokens, filter stopwords, normalize to lowercase,
-    remove punctuation, and join multi-word tokens by removing spaces (common hashtag style).
-    """
-    text_parts = [
-        getattr(request, "product_name", "") or "",
-        getattr(request, "target_persona", "") or "",
-        getattr(request, "selected_usp", "") or "",
-        getattr(request, "infor", "") or "",
-    ]
-    raw = " ".join([p for p in text_parts if p])
-    # basic stopwords (Vietnamese minimal list)
-    stopwords = {"và", "với", "cho", "của", "là", "một", "những", "các", "có", "để", "tại", "siêu"}
-
-    # tokenize by non-word characters, keep tokens with length > 1
-    tokens = re.findall(r"[\wÀ-ỹ]+", raw, flags=re.UNICODE)
-    candidates = []
-    for t in tokens:
-        low = t.lower()
-        if low in stopwords:
-            continue
-        if low.isdigit():
-            continue
-        if len(low) <= 1:
-            continue
-        candidates.append(low)
-
-    # preserve order, unique
-    seen = set()
-    uniq = []
-    for c in candidates:
-        if c in seen:
-            continue
-        seen.add(c)
-        uniq.append(c)
-
-    hashtags = []
-    for u in uniq:
-        tag = re.sub(r"[^\wÀ-ỹ]", "", u)
-        tag = tag.replace(" ", "")
-        if not tag:
-            continue
-        # limit hashtag length
-        tag = tag[:30]
-        hashtags.append("#" + tag)
-        if len(hashtags) >= 6:
-            break
-
-    # Ensure at least 3 hashtags by adding generic ones based on CTA intent
-    if len(hashtags) < 3:
-        cta = getattr(request, "cta_intent", "") or ""
-        if "sales" in str(cta).lower() or "mua" in raw.lower():
-            hashtags += [h for h in ["#khuyếnmãi", "#ưuđãi"] if h not in hashtags]
-        if len(hashtags) < 3:
-            hashtags += [h for h in ["#sảnphẩm", "#mẹothử"] if h not in hashtags]
-
-    # trim to 6
-    return hashtags[:6]
+# Hashtag generation removed per user request (Facebook hashtag suggestions were low-quality).
 
 
 # ========== AD COPY TYPE RULES & CTA TEMPLATES ==========
@@ -154,6 +95,37 @@ CTA_TEMPLATES = {
     CTAIntent.AWARENESS: "Tìm hiểu thêm tại {url}",
 }
 
+def _get_selected_usps_list(request: ContentGenerationRequest) -> list[str]:
+    usps_list = []
+    try:
+        if getattr(request, "selected_usps", None):
+            # ensure strings and strip empties
+            for u in request.selected_usps:
+                s = (u or "").strip()
+                if s:
+                    usps_list.append(s)
+        elif getattr(request, "selected_usp", None):
+            # fallback: split by common separators to allow multi via single field
+            raw = str(request.selected_usp)
+            parts = re.split(r"[\n,;|]", raw)
+            for p in parts:
+                s = p.strip()
+                if s:
+                    usps_list.append(s)
+    except Exception:
+        pass
+    # de-duplicate preserving order
+    seen = set()
+    uniq = []
+    for u in usps_list:
+        key = u.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(u)
+    return uniq
+
+
 def generate_marketing_content(request: ContentGenerationRequest) -> GeneratedContentResponse | None:
     """Sinh nội dung Marketing với Prompt đa tầng + cải tiến theo format, framework, angle, localization & self-review."""
 
@@ -168,7 +140,7 @@ def generate_marketing_content(request: ContentGenerationRequest) -> GeneratedCo
     seo_flag = bool(getattr(request, "seo_enabled", False))
 
     engine_layer = f"""
-SYSTEM ROLE: You are an elite Vietnamese marketing copywriter. You write natively for Vietnamese social media audiences.
+SYSTEM ROLE: You are an elite marketing copywriter who writes natively for the target language audience.
 
 OBJECTIVE: Produce HIGH-QUALITY marketing content strictly following the requested Format & Tone while reflecting Persona and chosen USP.
 
@@ -179,13 +151,13 @@ FRAMEWORK GUIDANCE:
 {framework_hint}
 
 LANGUAGE:
-Write in {lang_label}. Use natural phrasing for the target language.
+Write only in {lang_label}. Ensure all output (title and content) is in this language.
 
 HASHTAGS (Facebook only):
-For Facebook Post format, also suggest 3–6 relevant Vietnamese hashtags based on Product, Persona, USP and Key Highlights. Do not include hashtags for other formats.
+For Facebook Post format, also suggest 3–6 relevant hashtags based on Product, Persona, USP and Key Highlights in the selected language. Do not include hashtags for other formats.
 
-VIETNAMESE LOCALIZATION:
-Make wording natural for Vietnamese readers: friendly, concise, real-life phrasing. Avoid overly formal or machine-like translation artifacts. Use correct diacritics.
+LOCALIZATION:
+Make wording natural for the selected language: friendly, concise, real-life phrasing. Avoid overly formal or machine-like translation artifacts.
 
 SEO MODE:
 If SEO is enabled, include the required keywords exactly (no spelling changes) where natural. Prefer placing at least one keyword in the title and the first 100 words. Avoid keyword stuffing; keep density reasonable. Use short paragraphs and clear structure.
@@ -201,30 +173,34 @@ Refine once if any item is weak, then output only final JSON.
 
 OUTPUT CONSTRAINTS:
 Return ONLY a single valid JSON object (no surrounding text, no markdown fences). Keys required: "title", "content".
-Title MUST include a clear hook. Content ≈ 180-220 words for Facebook Post, 40-70 words for Ad Copy, ≤ 60 seconds worth (~120-150 words) for Video Script.
+Title MUST include a clear hook.
+DEFAULT LENGTH TARGETS (when user does NOT provide desired_length):
+- Facebook Post: ~300 words (dễ đọc, vẫn giữ đoạn ngắn 1–3 câu).
+- Ad Copy: ~200 words (theo yêu cầu; vẫn bảo đảm súc tích trong từng đoạn).
+- Video Script: ~150 words (tương đương ~55–65 giây đọc thoại tự nhiên).
+If user supplies desired_length, honor it (±15%) instead of defaults.
 """
 
     # =============== PROMPT LAYER 2: USER DATA ===============
     # Optional user-provided constraints
-    industry = getattr(request, "industry", None) or ""
     category = getattr(request, "category", None) or ""
-    topic = getattr(request, "topic", None) or ""
     desired_len = getattr(request, "desired_length", None)
     custom_title = (getattr(request, "custom_title", None) or "").strip()
     key_points = getattr(request, "key_points", None) or ""
     keywords_str = ", ".join(required_keywords) if required_keywords else ""
 
+    selected_usps = _get_selected_usps_list(request)
+    usps_text = "; ".join(selected_usps) if selected_usps else ""
+
     user_layer = f"""
 USER DATA:
 Product: {request.product_name}
 Persona: {request.target_persona}
-Chosen USP: {request.selected_usp}
+Chosen USPs: {usps_text}
 Key Highlights: {request.infor}
 Tone: {request.selected_tone.value}
 Format: {request.selected_format.value}
-Industry: {industry}
 Category: {category}
-Topic: {topic}
 Desired Length (words): {desired_len}
 Custom Title (if any): {custom_title}
 Key Points / Requirements: {key_points}
@@ -375,10 +351,11 @@ SEO Enabled: {seo_flag}
             except Exception:
                 return original
 
+        # New default length windows (min,max) used only if user did not specify desired_length.
         WORD_LIMITS = {
-            Format.FACEBOOK_POST: (140, 220),
-            Format.ADx_COPY: (20, 70),
-            Format.VIDEO_SCRIPT: (80, 160),
+            Format.FACEBOOK_POST: (260, 340),  # ~300 words target
+            Format.ADx_COPY: (170, 230),       # ~200 words target
+            Format.VIDEO_SCRIPT: (120, 180),   # ~150 words target (~55–65s)
         }
         # Override by desired length if provided (±15%)
         if isinstance(desired_len, int) and desired_len > 0:
@@ -415,26 +392,7 @@ SEO Enabled: {seo_flag}
         if copy_intensity:
             prompt += f"\nCOPY_INTENSITY: {copy_intensity.value}"
 
-        # Suggest hashtags for Facebook posts and append to content & prompt for traceability
-        if request.selected_format == Format.FACEBOOK_POST:
-            try:
-                tags = suggest_hashtags(request)
-                # Incorporate required keywords into hashtags where sensible
-                if required_keywords:
-                    for kw in required_keywords:
-                        tok = re.sub(r"[^\wÀ-ỹ]", "", kw.lower())
-                        if tok and ("#" + tok) not in tags:
-                            tags.append("#" + tok)
-                            if len(tags) >= 6:
-                                break
-                if tags:
-                    hashtags_line = " ".join(tags)
-                    # append hashtags to content separated by two newlines
-                    content = content.strip() + "\n\n" + hashtags_line
-                    prompt += f"\nSUGGESTED_HASHTAGS: {hashtags_line}"
-            except Exception:
-                # non-fatal: continue without hashtags
-                pass
+        # Facebook hashtag generation intentionally removed.
 
         return GeneratedContentResponse(
             title=title,
@@ -453,7 +411,8 @@ def choose_ad_copy_style(request) -> AdCopyStyle | None:
     """
     if getattr(request, "ad_copy_style", None):
         return request.ad_copy_style
-    text = f"{request.target_persona} {request.selected_usp} {request.infor}".lower()
+    usps_text = " ".join(_get_selected_usps_list(request))
+    text = f"{request.target_persona} {usps_text} {request.infor}".lower()
     if any(k in text for k in ("giảm", "giảm giá", "khuyến mãi", "freeship", "ưu đãi", "giá")):
         return AdCopyStyle.SAVINGS
     if any(k in text for k in ("yêu", "lo lắng", "quan tâm", "muốn", "cần")):
@@ -466,7 +425,8 @@ def choose_cta_intent(request) -> CTAIntent | None:
     if getattr(request, "cta_intent", None):
         return request.cta_intent
     # Heuristic: if copy includes booking/purchase cues -> SALES; if asks for contact -> LEAD
-    text = f"{request.selected_usp} {request.infor} {request.target_persona}".lower()
+    usps_text = " ".join(_get_selected_usps_list(request))
+    text = f"{usps_text} {request.infor} {request.target_persona}".lower()
     if any(k in text for k in ("mua ngay", "mua", "đặt", "giảm")):
         return CTAIntent.SALES
     if any(k in text for k in ("tư vấn", "liên hệ", "đăng ký")):

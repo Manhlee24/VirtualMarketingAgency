@@ -63,7 +63,15 @@ def generate_content(request: ContentGenerationRequest):
     """
     Endpoint Giai đoạn 2: Nhận ma trận Marketing và trả về nội dung (copy).
     """
-    print(f"Bắt đầu tạo nội dung cho USP: {request.selected_usp}")
+    try:
+        usps = []
+        if getattr(request, "selected_usps", None):
+            usps = [u for u in request.selected_usps if u]
+        elif getattr(request, "selected_usp", None):
+            usps = [str(request.selected_usp)]
+        print(f"Bắt đầu tạo nội dung cho USP(s): {', '.join(usps)}")
+    except Exception:
+        print("Bắt đầu tạo nội dung cho USP(s): (không xác định)")
     try:
         result = generate_marketing_content(request)
         if result:
@@ -122,35 +130,6 @@ def image_limitations():
     """Trả về danh sách các hạn chế đã biết của mô hình xử lý hình ảnh để hiển thị phía frontend."""
     return {"limitations": IMAGE_LIMITATIONS}
 
-@router.post("/test_upload")
-async def test_upload(image: UploadFile = File(...)):
-    """
-    Endpoint test để upload ảnh lên Cloudinary.
-    Cách dùng với curl:
-    curl -X POST "http://localhost:8000/api/v1/test_upload" -H "accept: application/json" -F "image=@/path/to/your/image.jpg"
-    """
-    try:
-        contents = await image.read()
-        cloudinary_url = upload_to_cloudinary(contents, "test")
-        
-        if cloudinary_url:
-            return {
-                "status": "success",
-                "message": "Upload thành công",
-                "cloudinary_url": cloudinary_url,
-                "filename": image.filename
-            }
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail="Không thể upload lên Cloudinary"
-            )
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Lỗi khi upload: {str(e)}"
-        )
 
 @router.post("/analyze_competitor", response_model=CompetitorAnalysisResult)
 def analyze_competitor(request: CompetitorAnalysisRequest):
@@ -174,22 +153,35 @@ async def analyze_document(
     user_email: str = Depends(get_current_user_email),
     db: Session = Depends(get_db)
 ):
+    """Phân tích tài liệu để trích xuất thông tin sản phẩm chuẩn hóa.
+
+    Tự động suy luận loại file từ phần mở rộng. Hỗ trợ: pdf, docx, txt.
     """
-    Endpoint để phân tích tài liệu sản phẩm và lưu kết quả.
-    """
-    if not file.filename.endswith(('.pdf', '.docx', '.txt')):
+    filename_lower = file.filename.lower()
+    if not filename_lower.endswith((".pdf", ".docx", ".txt")):
         raise HTTPException(status_code=400, detail="Định dạng file không hợp lệ. Chỉ chấp nhận PDF, DOCX, TXT.")
+
+    # Suy luận file_type
+    if filename_lower.endswith(".pdf"):
+        file_type = "pdf"
+    elif filename_lower.endswith(".docx"):
+        file_type = "docx"
+    else:
+        file_type = "txt"
 
     try:
         contents = await file.read()
-        analysis_result = await generate_product_analysis_from_document(contents, file.filename)
+        # Pass empty product_name to allow auto-guessing inside core function
+        analysis_result = generate_product_analysis_from_document("", contents, file_type)
+        if not analysis_result:
+            raise HTTPException(status_code=500, detail="Không thể phân tích tài liệu (kết quả rỗng).")
 
         # Lưu kết quả vào DB
         analysis_record = AnalysisRecord(
             user_email=user_email,
             product_name=analysis_result.product_name,
-            usps_json=json.dumps(analysis_result.usps),
-            pain_points_json=json.dumps(analysis_result.pain_points),
+            usps_json=json.dumps(analysis_result.usps, ensure_ascii=False),
+            pain_points_json=json.dumps(analysis_result.pain_points, ensure_ascii=False),
             target_persona=analysis_result.target_persona,
             infor=analysis_result.infor
         )
@@ -199,7 +191,10 @@ async def analyze_document(
 
         return analysis_result
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
-        print(f"Lỗi khi phân tích tài liệu: {e}")
+        logger.exception("Lỗi khi phân tích tài liệu")
         raise HTTPException(status_code=500, detail=f"Lỗi Server: {str(e)}")

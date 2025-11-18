@@ -58,6 +58,16 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
         return ""
 
 
+def extract_text_from_txt(file_bytes: bytes) -> str:
+    """Extract text from a plain text file bytes."""
+    for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            return file_bytes.decode(encoding, errors="replace")
+        except Exception:
+            continue
+    return ""
+
+
 # NOTE: Product-level structured analysis removed per new requirement; only marketing generation retained.
 
 
@@ -89,6 +99,8 @@ def generate_marketing_from_document(product_name: str, file_bytes: bytes, file_
         full_document_text = extract_text_from_pdf(file_bytes)
     elif file_type == 'docx':
         full_document_text = extract_text_from_docx(file_bytes)
+    elif file_type == 'txt':
+        full_document_text = extract_text_from_txt(file_bytes)
     else:
         logger.error("Unsupported file type for marketing generation: %s", file_type)
         return None
@@ -287,6 +299,8 @@ def generate_product_analysis_from_document(product_name: str, file_bytes: bytes
         full_document_text = extract_text_from_pdf(file_bytes)
     elif file_type == 'docx':
         full_document_text = extract_text_from_docx(file_bytes)
+    elif file_type == 'txt':
+        full_document_text = extract_text_from_txt(file_bytes)
     else:
         logger.error("Unsupported file type for product analysis: %s", file_type)
         return None

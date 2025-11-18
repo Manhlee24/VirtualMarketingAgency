@@ -5,23 +5,18 @@ import { ToneOptions, FormatOptions } from "../utils/constants.jsx";
 
 function ContentForm({
   analysisData,
-  selectedUsp,
-  setSelectedUsp,
+  selectedUsps,
+  setSelectedUsps,
   selectedFormat,
   setSelectedFormat,
   selectedTone,
   setSelectedTone,
-  // new optional inputs
-  industry,
-  setIndustry,
   seoEnabled,
   setSeoEnabled,
   language,
   setLanguage,
   category,
   setCategory,
-  topic,
-  setTopic,
   desiredLength,
   setDesiredLength,
   customTitle,
@@ -43,7 +38,8 @@ function ContentForm({
   const handleSave = () => {
     onSaveContent({
       ...analysisData,
-      selected_usp: selectedUsp,
+      // Store as a string for history compatibility
+      selected_usp: Array.isArray(selectedUsps) ? selectedUsps.join(", ") : String(selectedUsps || ""),
       selected_format: selectedFormat,
       selected_tone: selectedTone,
       title: generatedContent.title,
@@ -69,26 +65,44 @@ function ContentForm({
         className="p-6 bg-white rounded-xl shadow-lg border border-gray-200 mb-10"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Chọn USP */}
+          {/* Chọn USP (checkbox multi-select) */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">
-              1. Chọn Điểm Bán Hàng (USP)
+              1. Chọn Điểm Bán Hàng (USP) — có thể chọn nhiều
             </label>
-            <select
-              value={selectedUsp}
-              onChange={(e) => setSelectedUsp(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm max-w-full overflow-hidden"
-              required
-            >
+            <div className="space-y-2 max-h-56 overflow-y-auto p-3 border border-gray-200 rounded-lg bg-white shadow-sm">
               {analysisData.usps.map((usp, index) => {
-                const label = typeof usp === 'string' && usp.length > 80 ? usp.slice(0, 80) + '…' : usp;
+                const id = `usp_${index}`;
+                const checked = selectedUsps.includes(usp);
+                const label = typeof usp === 'string' && usp.length > 100 ? usp.slice(0, 100) + '…' : usp;
                 return (
-                  <option key={index} value={usp} title={usp}>
-                    {label}
-                  </option>
+                  <div key={index} className="flex items-start gap-2">
+                    <input
+                      id={id}
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedUsps([...selectedUsps, usp]);
+                        } else {
+                          setSelectedUsps(selectedUsps.filter((u) => u !== usp));
+                        }
+                      }}
+                      className="mt-1 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                    />
+                    <label htmlFor={id} className="text-sm text-gray-700 leading-snug cursor-pointer select-text">
+                      {label}
+                    </label>
+                  </div>
                 );
               })}
-            </select>
+              {analysisData.usps.length === 0 && (
+                <p className="text-xs text-gray-500">Không có USP nào được tìm thấy.</p>
+              )}
+            </div>
+            {selectedUsps.length === 0 && (
+              <p className="text-xs text-red-600 mt-1 font-medium">Vui lòng chọn ít nhất 1 USP.</p>
+            )}
           </div>
 
           {/* Chọn Format */}
@@ -131,17 +145,7 @@ function ContentForm({
 
           {/* New optional inputs */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">4. Lĩnh vực (Industry)</label>
-            <input
-              type="text"
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              placeholder="Ví dụ: Mỹ phẩm, F&B, Giáo dục..."
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">5. Bật SEO</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">4. Bật SEO</label>
             <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-white shadow-sm">
               <input
                 id="seoFlag"
@@ -154,7 +158,7 @@ function ContentForm({
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">6. Ngôn ngữ (Language)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">5. Ngôn ngữ (Language)</label>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
@@ -165,7 +169,7 @@ function ContentForm({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">7. Thể loại (Category)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">6. Thể loại (Category)</label>
             <input
               type="text"
               value={category}
@@ -174,18 +178,8 @@ function ContentForm({
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
             />
           </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">8. Chủ đề (Topic)</label>
-            <input
-              type="text"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="Ví dụ: Giới thiệu sản phẩm"
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
-            />
-          </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">9. Độ dài mong muốn (số từ)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">7. Độ dài mong muốn (số từ)</label>
             <input
               type="number"
               min="50"
@@ -197,7 +191,7 @@ function ContentForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">10. Tiêu đề gợi ý (nếu có)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">8. Tiêu đề gợi ý (nếu có)</label>
             <input
               type="text"
               value={customTitle}
@@ -207,7 +201,7 @@ function ContentForm({
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">11. Ý chính / yêu cầu (có thể xuống dòng)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">9. Ý chính / yêu cầu (có thể xuống dòng)</label>
             <textarea
               rows={4}
               value={keyPoints}
@@ -217,7 +211,7 @@ function ContentForm({
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">12. Từ khoá cần có (phân tách bằng dấu phẩy hoặc xuống dòng)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">10. Từ khoá cần có (phân tách bằng dấu phẩy hoặc xuống dòng)</label>
             <textarea
               rows={3}
               value={requiredKeywords}
@@ -242,7 +236,7 @@ function ContentForm({
       </form>
 
       {/* Hiển thị Kết Quả Nội Dung */}
-      {generatedContent && (
+          {generatedContent && (
         <div className="p-8 bg-indigo-50 rounded-xl border-2 border-indigo-300 shadow-inner mb-8">
           <h4 className="text-xl font-extrabold text-indigo-700 mb-4 border-b pb-2">
             KẾT QUẢ SÁNG TẠO NỘI DUNG
@@ -251,7 +245,7 @@ function ContentForm({
           {/* Meta chips */}
           <div className="flex flex-wrap gap-2 mb-4">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800 font-semibold break-words">
-              USP: {selectedUsp}
+              USPs: {Array.isArray(selectedUsps) && selectedUsps.length > 0 ? selectedUsps.slice(0,5).join(" | ") : "(chưa chọn)"}
             </span>
             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-indigo-100 text-indigo-800 font-semibold">Tone: {selectedTone}</span>
             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800 font-semibold">Format: {selectedFormat}</span>
