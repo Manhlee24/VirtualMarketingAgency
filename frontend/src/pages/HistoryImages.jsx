@@ -1,6 +1,6 @@
 // src/pages/HistoryImages.jsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -13,6 +13,7 @@ export default function HistoryImages() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     if (!token) return;
@@ -44,18 +45,51 @@ export default function HistoryImages() {
 
   const toggle = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
+  useEffect(() => {
+    setExpanded({});
+  }, [searchTerm]);
+
+  const filteredImages = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return images;
+    return images.filter((item) => {
+      const fields = [
+        item.product_name,
+        item.usp,
+        item.infor,
+        item.style_short,
+      ];
+      return fields.some((value) =>
+        typeof value === "string" && value.toLowerCase().includes(q)
+      );
+    });
+  }, [images, searchTerm]);
+
   if (!token) return <div className="p-6">Vui lòng đăng nhập để xem lịch sử.</div>;
   if (loading) return <div className="p-6">Đang tải lịch sử poster...</div>;
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-extrabold">Lịch sử poster</h2>
-        <nav className="text-sm space-x-3">
-          <Link className="text-gray-600 hover:text-indigo-700" to="/history/analyses">Phân tích</Link>
-          <Link className="text-gray-600 hover:text-indigo-700" to="/history/contents">Nội dung</Link>
-          <Link className="text-indigo-700 font-semibold" to="/history/images">Poster</Link>
-        </nav>
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-6">
+        <div>
+          <h2 className="text-3xl font-extrabold">Lịch sử poster</h2>
+          <nav className="mt-2 text-sm space-x-3">
+            <Link className="text-gray-600 hover:text-indigo-700" to="/history/analyses">Phân tích</Link>
+            <Link className="text-gray-600 hover:text-indigo-700" to="/history/contents">Nội dung</Link>
+            <Link className="text-indigo-700 font-semibold" to="/history/images">Poster</Link>
+          </nav>
+        </div>
+        <div className="w-full md:max-w-xs">
+          <label htmlFor="image-search" className="sr-only">Tìm kiếm</label>
+          <input
+            id="image-search"
+            type="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Tìm theo tên sản phẩm, USP, style..."
+            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+        </div>
       </div>
 
       {error && (
@@ -64,9 +98,11 @@ export default function HistoryImages() {
 
       {images.length === 0 ? (
         <p className="text-gray-600">Chưa có bản ghi.</p>
+      ) : filteredImages.length === 0 ? (
+        <p className="text-gray-600">Không tìm thấy bản ghi phù hợp với "{searchTerm}".</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {images.map((r) => (
+          {filteredImages.map((r) => (
             <div key={r.id} className="p-4 bg-white rounded border shadow-sm card-hover">
               <div className="flex items-center justify-between">
                 <div>

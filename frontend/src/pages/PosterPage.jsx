@@ -253,7 +253,7 @@ export default function PosterPage() {
         <div className="mt-8 p-6 bg-indigo-50 border border-indigo-200 rounded">
           <div className="font-bold text-indigo-800 mb-2">Kết quả</div>
           <img src={result.image_url} alt="poster" className="rounded border max-w-sm" />
-          <p className="mt-3 text-xs text-gray-600">Prompt dùng: <span className="font-mono">{result.prompt_used}</span></p>
+    
           <div className="mt-3 flex gap-3">
             <a href={result.image_url} target="_blank" rel="noreferrer" className="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded">Xem / Tải</a>
             {token && (

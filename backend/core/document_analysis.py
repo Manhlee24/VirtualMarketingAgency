@@ -3,7 +3,7 @@ import json
 import logging
 from dotenv import load_dotenv
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Tuple
 from core.ai_clients import get_gemini_client, GEMINI_API_KEY
 from google.genai import types
 
@@ -68,25 +68,84 @@ def extract_text_from_txt(file_bytes: bytes) -> str:
     return ""
 
 
-# NOTE: Product-level structured analysis removed per new requirement; only marketing generation retained.
+def detect_product_name_with_gemini(file_bytes: bytes, file_type: str) -> Tuple[Optional[str], float, Optional[str]]:
+    """Use Gemini to read the original file (PDF/DOC/TXT) directly and detect the main product name.
 
-
-def _guess_product_name_from_text(text: str) -> str:
-    """Heuristically guess a product name from document text.
-    Strategy: pick the first non-empty line that looks like a title (3-120 chars).
-    Fallback to 'Sản phẩm'.
+    Returns (product_name, confidence, reason).
+    If detection fails, product_name will be None and confidence 0.0.
     """
     try:
-        for raw in text.splitlines():
-            line = (raw or "").strip()
-            if not line:
-                continue
-            # skip very long or very short lines
-            if 3 <= len(line) <= 120:
-                return line
-    except Exception:
-        pass
-    return "Sản phẩm"
+        client = get_gemini_client()
+        if not client:
+            logger.error("Gemini client not initialized; cannot detect product name from document.")
+            return None, 0.0, None
+
+        if not hasattr(types, "Part"):
+            logger.error("google.genai.types.Part not available; cannot send raw file to Gemini.")
+            return None, 0.0, None
+
+        mime_type = "application/pdf"
+        if file_type == "docx":
+            mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif file_type == "txt":
+            mime_type = "text/plain"
+
+        doc_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+
+        prompt = """
+Bạn là một chuyên gia marketing.
+Nhiệm vụ: đọc tài liệu (PDF/DOC/TXT) được gửi kèm và xác định 1 sản phẩm/chương trình/dịch vụ CHÍNH đang được quảng bá.
+
+Quy tắc:
+- Nếu có nhiều sản phẩm, hãy chọn sản phẩm làm trọng tâm, được nhắc đến nhiều nhất hoặc rõ nhất.
+- Không bịa thêm tên sản phẩm nếu tài liệu không đề cập.
+
+ĐẦU RA BẮT BUỘC: trả về DUY NHẤT một JSON hợp lệ, KHÔNG thêm chữ nào khác:
+{
+  "product_name": "tên sản phẩm chính hoặc null nếu không rõ",
+  "confidence": 0.0-1.0,
+  "reason": "giải thích ngắn (tối đa 40 từ) vì sao chọn tên này"
+}
+"""
+
+        cfg = types.GenerateContentConfig(response_mime_type="application/json") if hasattr(types, "GenerateContentConfig") else None
+
+        response = None
+        contents = [doc_part, prompt]
+        if hasattr(client, "models") and hasattr(client.models, "generate_content"):
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=contents,
+                config=cfg,
+            )
+        elif hasattr(client, "generate_content"):
+            response = client.generate_content(contents)
+        else:
+            logger.error("Gemini client missing generate_content for product name detection.")
+            return None, 0.0, None
+
+        text_out = getattr(response, "text", None)
+        if not text_out:
+            logger.warning("Gemini returned empty text for product name detection.")
+            return None, 0.0, None
+
+        try:
+            cleaned = text_out.strip().replace("```json", "").replace("```", "").strip()
+            data = json.loads(cleaned)
+        except Exception as e:
+            logger.warning("Failed to parse JSON from Gemini product name detection: %s", e)
+            logger.debug("Raw response: %s", text_out[:2000])
+            return None, 0.0, None
+
+        name = data.get("product_name") if isinstance(data, dict) else None
+        confidence = float(data.get("confidence") or 0.0) if isinstance(data, dict) else 0.0
+        reason = data.get("reason") if isinstance(data, dict) else None
+        if isinstance(name, str):
+            name = name.strip() or None
+        return name, confidence, reason
+    except Exception as e:
+        logger.error("Error detecting product name with Gemini: %s", e)
+        return None, 0.0, None
 
 
 def generate_marketing_from_document(product_name: str, file_bytes: bytes, file_type: str) -> Optional[GeneratedContentResponse]:
@@ -294,7 +353,21 @@ def generate_product_analysis_from_document(product_name: str, file_bytes: bytes
     This function mirrors the output shape of `data_analysis.analyze_product_data` so
     downstream marketing generation can re-use the same schema.
     """
-    # Extract text
+    # If product_name is missing/empty, use Gemini to detect it directly from the original file
+    effective_product_name = product_name.strip() if product_name else ""
+    detection_reason = None
+    detection_conf = 0.0
+    if not effective_product_name:
+        detected_name, detection_conf, detection_reason = detect_product_name_with_gemini(file_bytes, file_type)
+        if detected_name:
+            effective_product_name = detected_name
+            logger.info("Detected product name from document via Gemini: '%s' (confidence=%.2f)", detected_name, detection_conf)
+        else:
+            logger.warning("Gemini could not confidently detect product name; falling back to generic label.")
+            effective_product_name = "Sản phẩm"
+
+    # Extract text for detailed analysis (Gemini ở trên đọc file gốc để lấy tên;
+    # phần còn lại vẫn dùng text trích xuất để giữ nguyên prompt hiện tại.)
     if file_type == 'pdf':
         full_document_text = extract_text_from_pdf(file_bytes)
     elif file_type == 'docx':
@@ -311,11 +384,6 @@ def generate_product_analysis_from_document(product_name: str, file_bytes: bytes
 
     MAX_TEXT_LENGTH = 15000
     truncated_text = full_document_text[:MAX_TEXT_LENGTH]
-
-    # If product_name is missing/empty, try to guess from the document text
-    effective_product_name = product_name.strip() if product_name else ""
-    if not effective_product_name:
-        effective_product_name = _guess_product_name_from_text(truncated_text)
 
     prompt = f"""
 Bạn là một chuyên gia phân tích sản phẩm dành cho mục đích marketing. Dựa CHỈ trên nội dung tài liệu được cung cấp dưới đây và tên sản phẩm, hãy trích xuất các thông tin cấu trúc phù hợp để phục vụ việc tạo nội dung quảng cáo và định vị sản phẩm.
@@ -339,7 +407,7 @@ Quy tắc:
 6) Trả về duy nhất JSON, không có chú thích, không có markdown hoặc code fences.
 """
 
-    logger.info("Generating product analysis from document for '%s' (len=%d)...", product_name, len(truncated_text))
+    logger.info("Generating product analysis from document for '%s' (len=%d)...", effective_product_name, len(truncated_text))
 
     try:
         client = get_gemini_client()
