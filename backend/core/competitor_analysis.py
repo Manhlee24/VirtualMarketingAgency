@@ -2,6 +2,7 @@ import json
 import logging
 from typing import Optional
 from google.genai import types
+from google.genai.errors import ServerError as GeminiServerError
 from core.ai_clients import get_gemini_client, GEMINI_API_KEY
 
 logger = logging.getLogger(__name__)
@@ -68,58 +69,121 @@ Cấu trúc JSON phải là:
         if not client or not GEMINI_API_KEY:
             logger.error("Gemini client không khả dụng hoặc API key không được cấu hình")
             return None
-        
-        response = None
+
         # Cấu hình để sử dụng Google Search
         cfg = types.GenerateContentConfig(
             tools=[{"google_search": {}}]
         ) if hasattr(types, "GenerateContentConfig") else None
-        
+
         logger.info(f"Đang phân tích đối thủ cạnh tranh: {competitor_name}")
-        
-        # Gọi Gemini API với Google Search
-        if hasattr(client, "models") and hasattr(client.models, "generate_content"):
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-                config=cfg
-            )
-        elif hasattr(client, "generate_content"):
-            # Fallback nếu không có tools config
-            response = client.generate_content(prompt)
-        else:
-            logger.error("Không thể gọi generate_content từ Gemini client")
-            return None
-        
-        # Xử lý response
-        if response and hasattr(response, "text"):
-            raw_text = response.text.strip()
-            logger.info(f"Phản hồi từ Gemini: {raw_text[:200]}...")
-            
-            # Làm sạch text để lấy JSON
-            # Loại bỏ markdown code blocks nếu có
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:]
-            if raw_text.startswith("```"):
-                raw_text = raw_text[3:]
-            if raw_text.endswith("```"):
-                raw_text = raw_text[:-3]
-            
-            raw_text = raw_text.strip()
-            
-            # Parse JSON
+
+        # Thử nhiều model để tránh lỗi quá tải 503
+        candidate_models = [
+            "gemini-2.5-flash",
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-8b",
+        ]
+
+        last_error: Exception | None = None
+        response = None
+        for model_name in candidate_models:
             try:
-                parsed_data = json.loads(raw_text)
-                logger.info("Phân tích đối thủ thành công")
-                return parsed_data
-            except json.JSONDecodeError as je:
-                logger.error(f"Lỗi parse JSON: {je}")
-                logger.error(f"Raw text: {raw_text}")
+                if hasattr(client, "models") and hasattr(client.models, "generate_content"):
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=cfg
+                    )
+                elif hasattr(client, "generate_content"):
+                    # Fallback nếu không có tools config
+                    response = client.generate_content(prompt)
+                else:
+                    logger.error("Không thể gọi generate_content từ Gemini client")
+                    return None
+                logger.info("Gọi model '%s' thành công", model_name)
+                break
+            except GeminiServerError as ge:
+                last_error = ge
+                # Nếu quá tải 503 thì thử model khác
+                if getattr(ge, "status_code", None) == 503 or "UNAVAILABLE" in str(ge):
+                    logger.warning("Model '%s' quá tải (503). Thử model khác...", model_name)
+                    continue
+                # Lỗi server khác: ném ra luôn
+                raise
+            except Exception as e:
+                last_error = e
+                logger.warning("Gọi model '%s' thất bại: %s", model_name, e)
+                continue
+
+        if response is None:
+            # Nếu tất cả đều thất bại, ném lỗi cuối cùng (để router map đúng mã lỗi)
+            if last_error:
+                raise last_error
+            return None
+        
+        # Xử lý response an toàn (có thể text bị None)
+        raw_text = getattr(response, "text", None)
+        if not raw_text:
+            logger.warning("Gemini trả về response không có text cho đối thủ '%s'", competitor_name)
+            return None
+
+        raw_text = raw_text.strip()
+        logger.info("Phản hồi từ Gemini: %s...", raw_text[:200])
+
+        # Làm sạch markdown code fences nếu có
+        cleaned = raw_text.replace("```json", "").replace("```", "").strip()
+
+        # Thử parse trực tiếp
+        try:
+            parsed_data = json.loads(cleaned)
+            logger.info("Phân tích đối thủ thành công")
+            return parsed_data
+        except json.JSONDecodeError:
+            # Thử tìm đoạn JSON cân bằng dấu ngoặc
+            def _balanced_json_fragment(text: str):
+                start = text.find('{')
+                if start == -1:
+                    return None
+                depth = 0
+                in_string = False
+                escape = False
+                for i in range(start, len(text)):
+                    ch = text[i]
+                    if in_string:
+                        if escape:
+                            escape = False
+                        elif ch == '\\':
+                            escape = True
+                        elif ch == '"':
+                            in_string = False
+                    else:
+                        if ch == '"':
+                            in_string = True
+                        elif ch == '{':
+                            depth += 1
+                        elif ch == '}':
+                            depth -= 1
+                            if depth == 0:
+                                return text[start:i+1]
                 return None
-        else:
-            logger.error("Không nhận được response hợp lệ từ Gemini")
+
+            frag = _balanced_json_fragment(cleaned)
+            if frag:
+                try:
+                    parsed_data = json.loads(frag)
+                    logger.info("Phân tích đối thủ thành công (từ JSON fragment)")
+                    return parsed_data
+                except Exception as je2:
+                    logger.error("Lỗi parse JSON fragment: %s", je2)
+                    logger.debug("Fragment: %s", frag[:500])
+            logger.error("Không thể parse JSON từ phản hồi Gemini")
+            logger.debug("Raw text: %s", raw_text[:2000])
             return None
             
+    except GeminiServerError as e:
+        # Để router có thể trả về mã 503 phù hợp khi model quá tải
+        logger.error("Lỗi khi phân tích đối thủ cạnh tranh: %s", e, exc_info=True)
+        raise
     except Exception as e:
         logger.error(f"Lỗi khi phân tích đối thủ cạnh tranh: {e}", exc_info=True)
-        return None
+        raise

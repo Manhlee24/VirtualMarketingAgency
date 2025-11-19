@@ -161,7 +161,8 @@ def list_images(user_email: str = Depends(get_current_user_email), db: Session =
             infor=r.infor,
             style_short=r.style_short,
             image_url=r.image_url,
-            prompt_used=r.prompt_used,
+            # Do not expose prompt history anymore
+            prompt_used=None,
             reference_url=r.reference_url,
             created_at=r.created_at,
         )
@@ -192,7 +193,8 @@ def save_image(payload: SaveImageRequest, user_email: str = Depends(get_current_
             infor=payload.infor,
             style_short=payload.style_short,
             image_url=payload.image_url,
-            prompt_used=payload.prompt_used,
+            # Do not store prompt content anymore
+            prompt_used=None,
             reference_url=payload.reference_url,
         )
         db.add(rec)

@@ -58,6 +58,186 @@ IMAGE_LIMITATIONS = [
 # Cập nhật model response
  
 
+def build_style_suggestion(
+    product_name: Optional[str] = None,
+    lighting_overall: Optional[str] = None,
+    lighting_effect: Optional[str] = None,
+    style: Optional[str] = None,
+    palette: Optional[str] = None,
+    mood: Optional[str] = None,
+    context: Optional[str] = None,
+    detail: Optional[str] = None,
+    camera: Optional[str] = None,
+) -> str:
+    parts: list[str] = []
+    if style: parts.append(style)
+    if palette: parts.append(f"tông {palette}")
+    if mood: parts.append(mood)
+    if lighting_overall: parts.append(f"ánh sáng {lighting_overall}")
+    if lighting_effect: parts.append(lighting_effect)
+    if context: parts.append(context)
+    if detail: parts.append(f"chi tiết: {detail}")
+    if camera: parts.append(f"góc máy: {camera}")
+    base = ", ".join([p for p in parts if p])
+    if product_name:
+        base = f"{base}. Product: {product_name}" if base else f"Product: {product_name}"
+    return base.strip().strip(",")
+
+
+def build_poster_brief_template(
+    product_name: str,
+    product_type: Optional[str] = None,
+    *,
+    lighting_overall: Optional[str] = None,
+    lighting_effect: Optional[str] = None,
+    style: Optional[str] = None,
+    palette: Optional[str] = None,
+    mood: Optional[str] = None,
+    context: Optional[str] = None,
+    detail: Optional[str] = None,
+    camera: Optional[str] = None,
+) -> str:
+    """
+    Tạo đoạn hướng dẫn (prompt hướng dẫn người dùng) bằng tiếng Việt để thu thập yêu cầu
+    cho việc tạo poster, dựa trên tên/loại sản phẩm. Trả về chuỗi văn bản hoàn chỉnh
+    sẵn sàng hiển thị trên UI.
+
+    Args:
+        product_name: Tên sản phẩm người dùng đã chọn.
+        product_type: Loại sản phẩm (ví dụ: "mỹ phẩm", "điện thoại", "đồ uống", "thực phẩm",
+                      "thời trang", "điện tử gia dụng", ...). Có thể để None.
+
+    Returns:
+        str: Nội dung hướng dẫn theo định dạng các mục I-IV, có gợi ý phù hợp loại sản phẩm.
+    """
+    ptype = (product_type or "").strip().lower()
+
+    # Gợi ý mặc định nếu không xác định loại
+    suggestions = {
+        "lighting_overall": "mạnh mẽ/dịu nhẹ/tự nhiên/được dàn dựng",
+        "lighting_effect": "Tia sáng xuyên qua/Lấp lánh/Phản chiếu/Bóng đổ sắc nét",
+        "style": "sang trọng/tối giản/tươi mới/công nghệ cao/kịch tính",
+        "palette": "ấm/lạnh/rực rỡ/đơn sắc",
+        "mood": "Sự tự tin/khao khát/yên bình/sức mạnh/hiện đại",
+        "context": "studio tối giản/thiên nhiên tươi mát/đô thị tương lai/phòng tắm hiện đại/khu vườn lãng mạn",
+        "detail": "kiến trúc, cây cối, hiệu ứng thời tiết, hạt bụi/bokeh",
+        "camera": "cận cảnh (macro)/góc mắt thường/góc thấp/góc cao/1/3 bố cục",
+        "tail": "vẻ đặc trưng của sản phẩm",
+    }
+
+    # Tùy biến gợi ý theo một số loại sản phẩm phổ biến
+    if "mỹ phẩm" in ptype or "skincare" in ptype:
+        suggestions.update({
+            "lighting_overall": "dịu nhẹ/tự nhiên, softbox/beauty dish",
+            "lighting_effect": "phản chiếu mềm/bokeh ánh sáng mịn",
+            "style": "sang trọng/tối giản/organic",
+            "palette": "ấm nhẹ hoặc pastel",
+            "mood": "thanh khiết/yên bình/sang trọng",
+            "context": "phòng tắm hiện đại/spa/studio tối giản với bề mặt marble",
+            "detail": "giọt nước, lá xanh, texture da, hơi nước mỏng",
+            "tail": "kết cấu/chất liệu và cảm giác tinh khiết của sản phẩm",
+        })
+    elif "điện thoại" in ptype or "laptop" in ptype or "điện tử" in ptype:
+        suggestions.update({
+            "lighting_overall": "dàn dựng/công nghệ cao, rim light/cinematic",
+            "lighting_effect": "ánh viền/reflective highlights",
+            "style": "công nghệ cao/tối giản/kịch tính",
+            "palette": "lạnh/đơn sắc với điểm nhấn neon",
+            "mood": "hiện đại/sức mạnh/độ chính xác",
+            "context": "đô thị tương lai/studio với nền gradient/dải ánh sáng",
+            "detail": "đồ họa ánh sáng, surface phản chiếu, vật liệu kim loại",
+            "tail": "độ sáng màn hình/độ hoàn thiện bề mặt và cảm giác cao cấp",
+        })
+    elif "đồ uống" in ptype or "thức uống" in ptype or "cafe" in ptype or "trà" in ptype:
+        suggestions.update({
+            "lighting_overall": "tự nhiên/tươi mát, side-light để nổi bọt/texture",
+            "lighting_effect": "tia sáng nhẹ/bokeh nền mờ",
+            "style": "tươi mới/đời thường/ẩm thực",
+            "palette": "rực rỡ hoặc ấm tự nhiên",
+            "mood": "sảng khoái/gần gũi",
+            "context": "quán cà phê/ngoài trời buổi sáng/bàn gỗ studio",
+            "detail": "đá viên, giọt nước ngưng tụ, lá bạc hà/trái cây",
+            "tail": "mùi hương/độ mát lạnh và sự hấp dẫn thị giác của ly đồ uống",
+        })
+    elif "thời trang" in ptype or "quần áo" in ptype or "giày" in ptype:
+        suggestions.update({
+            "lighting_overall": "dàn dựng/fashion lighting (key + fill + rim)",
+            "lighting_effect": "bóng đổ sắc nét/ánh viền",
+            "style": "sang trọng/tối giản/high-fashion",
+            "palette": "đơn sắc hoặc phối tương phản",
+            "mood": "tự tin/hiện đại",
+            "context": "studio/backdrop sạch hoặc bối cảnh đường phố",
+            "detail": "nếp gấp vải, texture, chuyển động người mẫu",
+            "tail": "chất liệu và đường nét thiết kế nổi bật",
+        })
+    elif "thực phẩm" in ptype or "đồ ăn" in ptype:
+        suggestions.update({
+            "lighting_overall": "tự nhiên/ẩm thực, side-top light",
+            "lighting_effect": "bokeh ẩm thực/steam nhẹ",
+            "style": "ẩm thực/tươi mới/đời thường",
+            "palette": "ấm/tự nhiên",
+            "mood": "ấm cúng/gần gũi/gợi thèm ăn",
+            "context": "bàn ăn/nhà bếp/studio ẩm thực với props tối giản",
+            "detail": "hơi nước, texture bề mặt, topping",
+            "tail": "màu sắc/hương vị và độ tươi ngon của món ăn",
+        })
+
+    # Tránh biểu thức lồng dấu nháy bên trong f-string bằng cách tách biến
+    s_light_overall = suggestions["lighting_overall"]
+    s_light_effect = suggestions["lighting_effect"]
+    s_style = suggestions["style"]
+    s_palette = suggestions["palette"]
+    s_mood = suggestions["mood"]
+    s_context = suggestions["context"]
+    s_detail = suggestions["detail"]
+    s_camera = suggestions["camera"]
+    s_tail = suggestions["tail"]
+
+    suggested_style = build_style_suggestion(
+        product_name=product_name,
+        lighting_overall=lighting_overall,
+        lighting_effect=lighting_effect,
+        style=style,
+        palette=palette,
+        mood=mood,
+        context=context,
+        detail=detail,
+        camera=camera,
+    )
+
+    text = f"""
+Bạn đã chọn sản phẩm: **[{product_name}]**.
+
+Dựa trên loại sản phẩm này, để tạo một bức ảnh poster thật đẹp về ánh sáng và phong cách, tôi gợi ý bạn tập trung vào những tiêu chí sau đây. Hãy mô tả ý tưởng của bạn chi tiết nhất có thể:
+
+{('Gợi ý phong cách tóm tắt: ' + suggested_style) if suggested_style else ''}
+
+**I. Về Sản phẩm & Chủ thể Chính:**
+1.  **Sản phẩm:** [{product_name}] - Vui lòng xác nhận các chi tiết quan trọng về màu sắc, chất liệu, hình dạng (hoặc cung cấp ảnh tham khảo nếu chưa có).
+2.  **Chủ thể (nếu có):** Có muốn xuất hiện người mẫu/chủ thể nào không? (Nam/nữ, độ tuổi, phong cách, hành động/thái độ?)
+
+**II. Về Ánh sáng ([GỢI Ý ĐẶC BIỆT THEO LOẠI SẢN PHẨM]):**
+1.  **Mô tả tổng thể:** Bạn muốn ánh sáng [{s_light_overall}]? Màu sắc ánh sáng?
+2.  **Hiệu ứng đặc biệt:** [{s_light_effect}]?
+
+**III. Về Phong cách & Tâm trạng ([GỢI Ý ĐẶC BIỆT THEO LOẠI SẢN PHẨM]):**
+1.  **Phong cách nghệ thuật:** Bạn muốn phong cách [{s_style}]?
+2.  **Gam màu chủ đạo:** Tông [{s_palette}]?
+3.  **Tâm trạng/Cảm xúc:** [{s_mood}]?
+
+**IV. Về Bối cảnh ([GỢI Ý ĐẶC BIỆT THEO LOẠI SẢN PHẨM]):**
+1.  **Loại bối cảnh:** Bạn hình dung bối cảnh [{s_context}]?
+2.  **Chi tiết đặc biệt:** Yếu tố cụ thể nào ({s_detail})? Hậu cảnh rõ nét hay mờ ảo (bokeh)?
+3.  **Góc máy ảnh & Bố cục:** Bạn muốn nhìn từ góc nào? Sản phẩm ở trung tâm hay theo quy tắc 1/3? [{s_camera}]
+
+*Với [{product_name}], việc mô tả chi tiết về [{s_tail}] trong bối cảnh sẽ giúp bức ảnh trở nên chân thực và cuốn hút hơn rất nhiều!*
+
+Càng cung cấp nhiều chi tiết, kết quả sẽ càng gần với ý muốn của bạn.
+""".strip()
+
+    return text
+
+
 def _expand_style_with_gemini(style_short: str) -> Optional[str]:
     """
     Gọi Gemini để mở rộng yêu cầu chỉnh sửa/thay đổi ngắn thành prompt chi tiết (cho editing/inpainting).
@@ -224,7 +404,7 @@ Requirements:
                     if url:
                         return ImageGenerationResponse(
                             image_url=url, 
-                            prompt_used=final_prompt,
+                            prompt_used="",
                             reference_url=reference_url
                         )
 
@@ -237,14 +417,14 @@ Requirements:
                             if uploaded_url:
                                 return ImageGenerationResponse(
                                     image_url=uploaded_url,
-                                    prompt_used=final_prompt,
+                                    prompt_used="",
                                     reference_url=reference_url
                                 )
                             # nếu upload thất bại -> fallback trả data URL
                             data_url = f"data:image/png;base64,{b64}"
                             return ImageGenerationResponse(
                                 image_url=data_url,
-                                prompt_used=final_prompt,
+                                prompt_used="",
                                 reference_url=reference_url
                             )
                         except Exception as e:
@@ -252,7 +432,7 @@ Requirements:
                             data_url = f"data:image/png;base64,{b64}"
                             return ImageGenerationResponse(
                                 image_url=data_url,
-                                prompt_used=final_prompt,
+                                prompt_used="",
                                 reference_url=reference_url
                             )
 
@@ -264,7 +444,7 @@ Requirements:
         placeholder = "https://via.placeholder.com/1024x1024.png?text=Generated+Poster+Mock"
         return ImageGenerationResponse(
             image_url=placeholder, 
-            prompt_used=final_prompt,
+            prompt_used="",
             reference_url=reference_url 
         )
     except Exception as e:
@@ -273,7 +453,7 @@ Requirements:
         placeholder = "https://via.placeholder.com/1024x1024.png?text=ERROR"
         return ImageGenerationResponse(
             image_url=placeholder, 
-            prompt_used=f"ERROR: {err}",
+            prompt_used="",
             reference_url=None
         )
 
@@ -384,13 +564,13 @@ def generate_marketing_poster(
                             if uploaded_url:
                                 return ImageGenerationResponse(
                                     image_url=uploaded_url,
-                                    prompt_used=final_prompt,
+                                    prompt_used="",
                                     reference_url=None,
                                 )
                             data_url = f"data:image/png;base64,{b64}"
                             return ImageGenerationResponse(
                                 image_url=data_url,
-                                prompt_used=final_prompt,
+                                prompt_used="",
                                 reference_url=None,
                             )
 
@@ -405,7 +585,7 @@ def generate_marketing_poster(
         placeholder = "https://via.placeholder.com/1024x1024.png?text=EDIT+FAIL+MOCK"
         return ImageGenerationResponse(
             image_url=placeholder, 
-            prompt_used=final_prompt,
+            prompt_used="",
             reference_url=None
         )
         
@@ -415,6 +595,6 @@ def generate_marketing_poster(
         placeholder = "https://via.placeholder.com/1024x1024.png?text=CRITICAL+ERROR"
         return ImageGenerationResponse(
             image_url=placeholder, 
-            prompt_used=f"CRITICAL ERROR: {err}",
+            prompt_used="",
             reference_url=None
         )

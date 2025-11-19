@@ -10,9 +10,16 @@ from core.data_analysis import analyze_product_data
 from core.content_generation import generate_marketing_content
 from core.document_analysis import generate_product_analysis_from_document
 
-from core.image_generation import generate_marketing_poster, upload_to_cloudinary, IMAGE_LIMITATIONS
+from core.image_generation import (
+    generate_marketing_poster,
+    upload_to_cloudinary,
+    IMAGE_LIMITATIONS,
+    build_poster_brief_template,
+    build_style_suggestion,
+)
 
 from core.competitor_analysis import analyze_competitor_market
+from google.genai.errors import ServerError as GeminiServerError
 from models.schemas import (
     ProductAnalysisRequest,
     ProductAnalysisResult,
@@ -134,6 +141,54 @@ def image_limitations():
     return {"limitations": IMAGE_LIMITATIONS}
 
 
+@router.get("/poster_prompt_template")
+def poster_prompt_template(
+    product_name: str,
+    product_type: Optional[str] = None,
+    lighting_overall: Optional[str] = None,
+    lighting_effect: Optional[str] = None,
+    style: Optional[str] = None,
+    palette: Optional[str] = None,
+    mood: Optional[str] = None,
+    context: Optional[str] = None,
+    detail: Optional[str] = None,
+    camera: Optional[str] = None,
+):
+    """Sinh template hướng dẫn và gợi ý phong cách tóm tắt dựa trên tên/loại sản phẩm và (tuỳ chọn) các thuộc tính đã chọn."""
+    try:
+        text = build_poster_brief_template(
+            product_name=product_name,
+            product_type=product_type,
+            lighting_overall=lighting_overall,
+            lighting_effect=lighting_effect,
+            style=style,
+            palette=palette,
+            mood=mood,
+            context=context,
+            detail=detail,
+            camera=camera,
+        )
+        style_suggestion = build_style_suggestion(
+            product_name=product_name,
+            lighting_overall=lighting_overall,
+            lighting_effect=lighting_effect,
+            style=style,
+            palette=palette,
+            mood=mood,
+            context=context,
+            detail=detail,
+            camera=camera,
+        )
+        return {
+            "product_name": product_name,
+            "product_type": product_type,
+            "template": text,
+            "style_suggestion": style_suggestion,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/analyze_competitor", response_model=CompetitorAnalysisResult)
 def analyze_competitor(request: CompetitorAnalysisRequest):
     """
@@ -146,11 +201,20 @@ def analyze_competitor(request: CompetitorAnalysisRequest):
         if result:
             # Ensure response matches Pydantic model
             return CompetitorAnalysisResult(**result)
+        # Không có kết quả nhưng không lỗi cụ thể -> 502 Bad Gateway (lỗi xử lý từ dịch vụ ngoài)
+        raise HTTPException(status_code=502, detail="Không thể phân tích đối thủ (không nhận được dữ liệu hợp lệ từ mô hình). Vui lòng thử lại.")
+    except GeminiServerError as ge:
+        msg = str(ge)
+        # Map đúng mã 503 khi model quá tải
+        if getattr(ge, "status_code", None) == 503 or "UNAVAILABLE" in msg or "overloaded" in msg.lower():
+            raise HTTPException(status_code=503, detail="Mô hình đang quá tải. Vui lòng thử lại sau.")
+        # Các lỗi server khác của Gemini
+        raise HTTPException(status_code=502, detail=f"Lỗi từ mô hình: {msg}")
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Lỗi phân tích đối thủ: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi Server: Không thể phân tích đối thủ. Lỗi chi tiết: {str(e)}")
-    
-    raise HTTPException(status_code=400, detail="Không thể phân tích đối thủ, vui lòng thử lại.")
 
 @router.post("/analyze_document", response_model=ProductAnalysisResult)
 async def analyze_document(

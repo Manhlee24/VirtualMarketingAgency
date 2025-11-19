@@ -114,10 +114,10 @@ function HomePage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4-4-4-4m6 8h10" />
                             </svg>
                         </div>
-                        <h3 className="text-2xl font-bold text-gray-900">Tạo Poster từ Ảnh Mẫu</h3>
+                        <h3 className="text-2xl font-bold text-gray-900">Tạo Ảnh</h3>
                     </div>
                     <p className="text-gray-700 mb-6 leading-relaxed">
-                        Bỏ qua Giai đoạn 1 và 2. Cung cấp ảnh mẫu bắt buộc, tên sản phẩm và (tuỳ chọn) phong cách để AI chỉnh sửa/tạo poster.
+                         Tạo ảnh nhanh chóng từ ảnh mẫu với phong cách tùy chỉnh, biến ý tưởng của bạn thành hiện thực.
                     </p>
                     <Link
                         to="/poster"

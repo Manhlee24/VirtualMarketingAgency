@@ -169,7 +169,7 @@ function ContentGenerationForm() {
 					setError(null);
 			setCurrentStep(2);
 			if (data.usps && data.usps.length > 0) {
-				setSelectedUsp(data.usps[0]);
+				setSelectedUsps([data.usps[0]]);
 			}
     } catch (err) {
       console.error("Lỗi khi gọi API phân tích:", err);
