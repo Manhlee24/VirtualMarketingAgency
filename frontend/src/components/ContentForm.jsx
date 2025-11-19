@@ -158,7 +158,7 @@ function ContentForm({
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">5. Ngôn ngữ (Language)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">5. Ngôn ngữ</label>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
@@ -169,7 +169,7 @@ function ContentForm({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">6. Thể loại (Category)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">6. Thể loại </label>
             <input
               type="text"
               value={category}

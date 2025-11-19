@@ -35,7 +35,7 @@ function AnalysisInput({ productName, setProductName, analysisMode, setAnalysisM
               onChange={() => setAnalysisMode("name")}
               className="text-indigo-600 focus:ring-indigo-600"
             />
-            <span className="font-medium text-gray-800">Phân tích theo Tên (Web Research)</span>
+            <span className="font-medium text-gray-800">Phân tích theo Tên </span>
           </label>
           <label className="inline-flex items-center space-x-2">
             <input

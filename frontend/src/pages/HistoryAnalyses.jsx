@@ -79,49 +79,81 @@ export default function HistoryAnalyses() {
       {analyses.length === 0 ? (
         <p className="text-gray-600">Chưa có bản ghi.</p>
       ) : (
-        <div className="space-y-2">
-          {analyses.map((r) => (
-            <div key={r.id} className="p-2 text-xs bg-white rounded border shadow-sm card-hover">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold text-indigo-700 clamp-1 text-sm" title={r.product_name}>{r.product_name}</div>
-                  <div className="text-[10px] text-gray-600">{new Date(r.created_at).toLocaleString()}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {analyses.map((r) => {
+            const isOpen = !!expanded[r.id];
+            return (
+              <div
+                key={r.id}
+                className="relative rounded-xl border border-indigo-100 bg-white shadow-sm hover:shadow-md transition group"
+              >
+                <div className="p-4">
+                  {/* Header row */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-indigo-700 truncate" title={r.product_name}>{r.product_name}</div>
+                      <div className="text-[11px] text-gray-500">{new Date(r.created_at).toLocaleString()}</div>
+                    </div>
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      className="text-xs font-medium px-2 py-1 rounded-md bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                    >Xóa</button>
+                  </div>
+
+                  {/* Collapsed preview */}
+                  {!isOpen && (
+                    <div className="mt-2 space-y-1 text-[12px]">
+                      <div className="font-semibold text-gray-900 truncate" title={r.target_persona}>Persona: {r.target_persona}</div>
+                      <div className="text-gray-600 truncate" title={`USPs: ${(r.usps||[]).join(' | ')}`}>USPs: {(r.usps||[]).slice(0,3).join(' | ')}{(r.usps||[]).length>3 ? '…' : ''}</div>
+                      <div className="text-gray-600 truncate" title={`Pain: ${(r.pain_points||[]).join(' | ')}`}>Pain: {(r.pain_points||[]).slice(0,3).join(' | ')}{(r.pain_points||[]).length>3 ? '…' : ''}</div>
+                    </div>
+                  )}
+
+                  {/* Expanded detail */}
+                  {isOpen && (
+                    <div className="mt-3 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                          <div className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide">Persona</div>
+                          <p className="mt-1 text-[12px] text-gray-800 whitespace-pre-wrap leading-relaxed">{r.target_persona}</p>
+                        </div>
+                        <div className="rounded-lg border border-teal-200 bg-teal-50 p-3">
+                          <div className="text-[11px] font-semibold text-teal-600 uppercase tracking-wide">Infor</div>
+                          <p className="mt-1 text-[12px] text-gray-800 whitespace-pre-wrap leading-relaxed">{r.infor || '—'}</p>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                        <div className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wide">USPs</div>
+                        <ul className="mt-1 space-y-1 text-[12px] text-gray-800 list-disc list-inside">
+                          {(r.usps||[]).map((u,i)=>(<li key={i}>{u}</li>))}
+                          {!(r.usps||[]).length && <li className="list-none text-gray-500">Không có</li>}
+                        </ul>
+                      </div>
+                      <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                        <div className="text-[11px] font-semibold text-rose-600 uppercase tracking-wide">Pain Points</div>
+                        <ul className="mt-1 space-y-1 text-[12px] text-gray-800 list-disc list-inside">
+                          {(r.pain_points||[]).map((p,i)=>(<li key={i}>{p}</li>))}
+                          {!(r.pain_points||[]).length && <li className="list-none text-gray-500">Không có</li>}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="mt-4 flex items-center justify-between">
+                    <button
+                      onClick={() => toggle(r.id)}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium"
+                    >{isOpen ? 'Thu gọn' : 'Xem chi tiết'}</button>
+                    <button
+                      onClick={() => handleContinue(r)}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow"
+                    >Tiếp tục tạo nội dung</button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(r.id)}
-                  className="text-[10px] bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded whitespace-nowrap"
-                >
-                  Xóa
-                </button>
               </div>
-              {!expanded[r.id] ? (
-                <>
-                  <div className="mt-1 text-[11px]"><span className="font-semibold">Persona:</span> <span className="clamp-1 inline-block align-top" title={r.target_persona}>{r.target_persona}</span></div>
-                  <div className="mt-1 text-[11px] text-gray-600">USP: {r.usps?.length || 0} | Pain: {r.pain_points?.length || 0}</div>
-                </>
-              ) : (
-                <>
-                  <div className="mt-2 text-sm"><span className="font-semibold">Persona:</span> {r.target_persona}</div>
-                  <div className="mt-1 text-sm"><span className="font-semibold">Infor:</span> {r.infor}</div>
-                  <div className="mt-1 text-sm"><span className="font-semibold">USPs:</span> {r.usps.join(' | ')}</div>
-                  <div className="mt-1 text-sm"><span className="font-semibold">Pain points:</span> {r.pain_points.join(' | ')}</div>
-                </>
-              )}
-              <div className="mt-2 flex items-center justify-between">
-                <button onClick={() => toggle(r.id)} className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-800">
-                  {expanded[r.id] ? 'Thu gọn' : 'Xem chi tiết'}
-                </button>
-                <div className="text-right">
-                  <button
-                    onClick={() => handleContinue(r)}
-                    className="text-[11px] bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded font-semibold"
-                  >
-                    Tiếp tục tạo nội dung
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

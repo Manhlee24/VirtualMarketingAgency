@@ -73,48 +73,79 @@ export default function HistoryContents() {
       {contents.length === 0 ? (
         <p className="text-gray-600">Chưa có bản ghi.</p>
       ) : (
-        <div className="space-y-2">
-          {contents.map((r) => (
-            <div key={r.id} className="p-2 text-xs bg-white rounded border shadow-sm card-hover">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold text-indigo-700 clamp-1 text-sm" title={r.product_name}>{r.product_name}</div>
-                  <div className="text-[10px] text-gray-600">{new Date(r.created_at).toLocaleString()}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {contents.map((r) => {
+            const isOpen = !!expanded[r.id];
+            return (
+              <div
+                key={r.id}
+                className="relative rounded-xl border border-indigo-100 bg-white shadow-sm hover:shadow-md transition group"
+              >
+                <div className="p-4">
+                  {/* Header row */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-indigo-700 truncate" title={r.product_name}>{r.product_name}</div>
+                      <div className="text-[11px] text-gray-500">{new Date(r.created_at).toLocaleString()}</div>
+                    </div>
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      className="text-xs font-medium px-2 py-1 rounded-md bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                    >Xóa</button>
+                  </div>
+
+                  {/* Collapsed preview */}
+                  {!isOpen && (
+                    <>
+                      <div className="mt-2 text-[13px] font-semibold text-gray-900 truncate" title={r.title}>{r.title}</div>
+                      <div className="mt-1 text-[12px] text-gray-700 line-clamp-2 whitespace-pre-wrap leading-snug" title={r.content}>{r.content}</div>
+                    </>
+                  )}
+
+                  {/* Expanded detail */}
+                  {isOpen && (
+                    <div className="mt-3 space-y-3">
+                      <h3 className="text-base font-bold text-gray-900" title={r.title}>{r.title}</h3>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-md border border-indigo-100 bg-indigo-50/60 p-2">
+                          <div className="text-[11px] font-semibold text-indigo-600">USP</div>
+                          <div className="text-[12px] text-gray-800 break-words">{r.selected_usp || '—'}</div>
+                        </div>
+                        <div className="rounded-md border border-violet-100 bg-violet-50/60 p-2">
+                          <div className="text-[11px] font-semibold text-violet-600">Tone</div>
+                          <div className="text-[12px] text-gray-800">{r.selected_tone || '—'}</div>
+                        </div>
+                        <div className="rounded-md border border-fuchsia-100 bg-fuchsia-50/60 p-2">
+                          <div className="text-[11px] font-semibold text-fuchsia-600">Format</div>
+                          <div className="text-[12px] text-gray-800">{r.selected_format || '—'}</div>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Thông tin thêm</div>
+                        <p className="mt-1 text-[12px] text-gray-800 whitespace-pre-wrap leading-relaxed">{r.infor || '—'}</p>
+                      </div>
+                      <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                        <div className="text-[11px] font-semibold text-orange-600 uppercase tracking-wide">Nội dung tạo</div>
+                        <pre className="mt-1 max-h-72 overflow-auto text-[12px] leading-relaxed whitespace-pre-wrap text-gray-900">{r.content}</pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="mt-4 flex items-center justify-between">
+                    <button
+                      onClick={() => toggle(r.id)}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium"
+                    >{isOpen ? 'Thu gọn' : 'Xem chi tiết'}</button>
+                    <button
+                      onClick={() => handleContinue(r)}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow"
+                    >Tiếp tục tạo poster</button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(r.id)}
-                  className="text-[10px] bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded whitespace-nowrap"
-                >
-                  Xóa
-                </button>
               </div>
-              {!expanded[r.id] ? (
-                <>
-                  <div className="mt-1 font-semibold clamp-1 text-[12px]" title={r.title}>{r.title}</div>
-                  <div className="mt-1 text-[11px] text-gray-700 clamp-1 whitespace-pre-wrap">{r.content}</div>
-                </>
-              ) : (
-                <>
-                  <div className="mt-1 text-sm">USP: {r.selected_usp}</div>
-                  <div className="mt-1 text-sm">Tone: {r.selected_tone} | Format: {r.selected_format}</div>
-                  <div className="mt-1 text-sm">Infor: {r.infor}</div>
-                  <div className="mt-2 font-semibold">{r.title}</div>
-                  <pre className="mt-1 text-sm whitespace-pre-wrap">{r.content}</pre>
-                </>
-              )}
-              <div className="mt-2 flex items-center justify-between">
-                <button onClick={() => toggle(r.id)} className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-800">
-                  {expanded[r.id] ? 'Thu gọn' : 'Xem chi tiết'}
-                </button>
-                <button
-                  onClick={() => handleContinue(r)}
-                  className="text-[11px] bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded font-semibold"
-                >
-                  Tiếp tục tạo poster
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

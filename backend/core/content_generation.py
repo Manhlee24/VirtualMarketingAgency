@@ -288,6 +288,46 @@ SEO Enabled: {seo_flag}
         # Favor custom title when provided
         if custom_title:
             title = custom_title
+        else:
+            # Giới hạn độ dài tiêu đề tự động (nếu người dùng không cung cấp)
+            # Quy ước: tối đa 14 từ hoặc 80 ký tự; giữ hook nếu có.
+            def _shorten_title(t: str, max_words: int = 14, max_chars: int = 80) -> str:
+                original = t.strip()
+                if not original:
+                    return original
+                hook_prefix = ""
+                # Giữ emoji / ký tự hook đầu nếu có
+                if original.startswith(("🔥", "🚀", "⚡", "💥", "✨")):
+                    parts = original.split(" ", 1)
+                    if len(parts) == 2:
+                        hook_prefix = parts[0] + " "
+                        original = parts[1]
+                words = re.findall(r"\S+", original)
+                if len(words) <= max_words and len(original) <= max_chars:
+                    return (hook_prefix + original).strip()
+                # Cắt theo giới hạn từ trước, sau đó kiểm tra ký tự
+                trimmed_words = words[:max_words]
+                candidate = " ".join(trimmed_words)
+                # Nếu vẫn quá dài về ký tự, rút ngắn thêm
+                if len(candidate) > max_chars:
+                    # cắt theo ký tự nhưng không cắt giữa từ; thêm dấu … nếu mất thông tin
+                    cut = []
+                    total = 0
+                    for w in trimmed_words:
+                        if total + len(w) + (1 if cut else 0) > max_chars - 1:  # chừa chỗ cho …
+                            break
+                        cut.append(w)
+                        total += len(w) + (1 if cut else 0)
+                    candidate = " ".join(cut)
+                    if candidate != original:
+                        candidate += "…"
+                else:
+                    # Thêm … nếu đã bị cắt từ so với bản gốc dài hơn đáng kể
+                    if len(words) > max_words:
+                        candidate += "…"
+                return (hook_prefix + candidate).strip()
+
+            title = _shorten_title(title)
 
         # =========== LENGTH ENFORCEMENT (words) ===========
         def count_words(text: str) -> int:
@@ -377,7 +417,11 @@ SEO Enabled: {seo_flag}
 
         # Post-process: ensure hook in title (very simple heuristic)
         if request.selected_format == Format.FACEBOOK_POST and not re.search(r"!|\?|\b(đột phá|bí mật|mẹo|cảnh báo)\b", title, re.I):
-            title = "🔥 " + title
+            # Nếu sau rút gọn chưa có hook emoji, thêm vào đầu nhưng đảm bảo không vượt quá max_chars (80)
+            if not title.startswith("🔥"):
+                decorated = "🔥 " + title
+                if len(decorated) <= 80:
+                    title = decorated
 
         # ========== AD/CALL-TO-ACTION DETECTION & PROMPT ENHANCEMENTS ==========
         ad_style = choose_ad_copy_style(request)

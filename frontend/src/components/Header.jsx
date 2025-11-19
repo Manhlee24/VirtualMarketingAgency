@@ -1,12 +1,25 @@
 // src/components/Header.jsx
 
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 function Header() {
     const { isAuthenticated, userName, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Helper to decide active classes
+    const navLinkClass = (to, options = {}) => {
+        const { startsWith } = options;
+        const isActive = startsWith
+            ? location.pathname.startsWith(startsWith)
+            : location.pathname === to;
+        const base = 'px-3 py-2 rounded-md text-sm font-medium transition duration-150';
+        const inactive = 'text-white hover:text-indigo-200 hover:bg-indigo-600/40';
+        const active = 'bg-white text-indigo-700 font-semibold shadow ring-2 ring-indigo-300';
+        return `${base} ${isActive ? active : inactive}`;
+    };
 
     const handleLogout = () => {
         logout();
@@ -24,38 +37,32 @@ function Header() {
 
                     {/* Menu và Auth Buttons */}
                     <nav className="flex items-center space-x-4">
-                        <Link 
-                            to="/" 
-                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
-                        >
-                            Trang chủ
-                        </Link>
-                        <Link 
-                            to="/generator" 
-                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
-                        >
-                            Tạo nội dung
-                        </Link>
-                        <Link 
-                            to="/poster" 
-                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
-                        >
-                            Tạo ảnh
-                        </Link>
-                        
-                        <Link 
-                            to="/competitor-analysis" 
-                            className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
-                        >
-                            Phân tích Đối thủ
-                        </Link>
-                           {isAuthenticated && (
-                            <Link 
-                                to="/history/analyses" 
-                                className="text-white hover:text-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150"
-                            >
-                                Lịch sử
-                            </Link>
+                        <Link
+                            to="/"
+                            className={navLinkClass('/')}
+                            aria-current={location.pathname === '/' ? 'page' : undefined}
+                        >Trang chủ</Link>
+                        <Link
+                            to="/generator"
+                            className={navLinkClass('/generator')}
+                            aria-current={location.pathname === '/generator' ? 'page' : undefined}
+                        >Tạo nội dung</Link>
+                        <Link
+                            to="/poster"
+                            className={navLinkClass('/poster')}
+                            aria-current={location.pathname === '/poster' ? 'page' : undefined}
+                        >Tạo ảnh</Link>
+                        <Link
+                            to="/competitor-analysis"
+                            className={navLinkClass('/competitor-analysis')}
+                            aria-current={location.pathname === '/competitor-analysis' ? 'page' : undefined}
+                        >Phân tích Đối thủ</Link>
+                        {isAuthenticated && (
+                            <Link
+                                to="/history/analyses"
+                                className={navLinkClass('/history/analyses', { startsWith: '/history' })}
+                                aria-current={location.pathname.startsWith('/history') ? 'page' : undefined}
+                            >Lịch sử</Link>
                         )}
                 
                         
@@ -73,18 +80,16 @@ function Header() {
                             </div>
                         ) : (
                             <>
-                                <Link 
-                                    to="/login" 
-                                    className="bg-white text-indigo-700 hover:bg-indigo-50 px-3 py-1 rounded-md text-sm font-medium transition duration-150 shadow"
-                                >
-                                    Đăng nhập
-                                </Link>
-                                <Link 
-                                    to="/register" 
-                                    className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded-md text-sm font-medium transition duration-150 shadow"
-                                >
-                                    Đăng ký
-                                </Link>
+                                <Link
+                                    to="/login"
+                                    className={navLinkClass('/login')}
+                                    aria-current={location.pathname === '/login' ? 'page' : undefined}
+                                >Đăng nhập</Link>
+                                <Link
+                                    to="/register"
+                                    className={navLinkClass('/register')}
+                                    aria-current={location.pathname === '/register' ? 'page' : undefined}
+                                >Đăng ký</Link>
                             </>
                         )}
                     </nav>
